@@ -14,21 +14,32 @@ datasource db {
 }
 
 model CallLog {
-  id        Int      @id @default(autoincrement())
-  callerId  String
-  action    String
-  createdAt DateTime @default(now())
+  id         String        @id @default(cuid())
+  callerId   String
+  calleeId   String?
+  direction  CallDirection
+  status     CallStatus
+  action     String?
+  agentId    String?
+  agent      Agent?        @relation(fields: [agentId], references: [id])
+  systemName String
+  hungUpBy   String?
+  duration   Int?
+  createdAt  DateTime      @default(now())
+  updatedAt  DateTime      @updatedAt
+  User       User?         @relation(fields: [userId], references: [id])
+  userId     String?
 }
 
 model User {
   id           String        @id @default(uuid())
-  email        String        @unique
   password     String
   sipUser      String        @unique
   sipPass      String
   status       AgentStatus
   createdAt    DateTime      @default(now())
   subscription Subscription?
+  CallLog      CallLog[]
 }
 
 model Subscription {
@@ -42,11 +53,80 @@ model Subscription {
 }
 
 model Agent {
-  id        String      @id @default(cuid())
-  name      String
-  sipUri    String
-  status    AgentStatus @default(AVAILABLE)
-  updatedAt DateTime    @updatedAt
+  id             String        @id @default(cuid())
+  name           String
+  profilePicture String
+  sipUname       String        @unique
+  sipPassword    String
+  password       String
+  firstName      String
+  lastName       String
+  phoneNumber    String
+  systemCompany  SystemCompany @relation(fields: [systemCompanyId], references: [id])
+  SIPTech        SIPTech
+
+  status          AgentStatus @default(AVAILABLE)
+  updatedAt       DateTime    @updatedAt
+  systemCompanyId Int
+  CallLog         CallLog[]
+}
+
+model SystemCompany {
+  id            Int         @id @default(autoincrement())
+  name          String
+  membersCount  String
+  address       String
+  country       String
+  state         String
+  SIPProvider   SIPProvider @relation(fields: [sIPProviderId], references: [id])
+  Agent         Agent[]
+  sIPProviderId String
+}
+
+model SIPProvider {
+  id            String          @id @default(uuid())
+  IpHost        String          @db.Inet
+  IpRange       String
+  SipUsername   String?
+  SipPassword   String?
+  SipTech       SIPTech
+  AccessToken   String?
+  CallLimit     Int             @default(50)
+  EndpointName  String          @unique
+  SystemCompany SystemCompany[]
+  createdAt     DateTime        @default(now())
+  updatedAt     DateTime        @updatedAt
+  RTPAddress    RTPAddress[]
+}
+
+model RTPAddress {
+  id            String      @id @default(cuid())
+  RTPAddress    String
+  Name          String
+  Remark        String      @db.Text
+  SIPProvider   SIPProvider @relation(fields: [sIPProviderId], references: [id])
+  sIPProviderId String
+}
+
+model CallSession {
+  id        String     @id @default(cuid())
+  callerId  String
+  type      String
+  status    CallStatus
+  createdAt DateTime   @default(now())
+  updatedAt DateTime   @updatedAt
+}
+
+enum SIPTech {
+  PJSIP
+  SIP
+  SKINNY
+  IAX
+}
+
+enum CallDirection {
+  INBOUND
+  OUTBOUND
 }
 
 enum AgentStatus {
@@ -56,19 +136,12 @@ enum AgentStatus {
   OFFLINE
 }
 
-model CallSession {
-  id        String     @id @default(cuid())
-  callerId  String
-  type      String // 👈 This must be here
-  status    CallStatus
-  createdAt DateTime   @default(now())
-  updatedAt DateTime   @updatedAt
-}
-
 enum CallStatus {
   WAITING
   RINGING
   CONNECTED
   HUNGUP
   FAILED
+  MISSED
+  TRANSFERRED
 }

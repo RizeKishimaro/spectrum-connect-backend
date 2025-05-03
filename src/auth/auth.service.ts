@@ -1,5 +1,5 @@
 
-import { Injectable } from '@nestjs/common';
+import { BadRequestException, Injectable } from '@nestjs/common';
 import { PrismaService } from '../utils/prisma/prisma.service';
 import * as bcrypt from 'bcrypt';
 import { JwtService } from '@nestjs/jwt';
@@ -18,7 +18,6 @@ export class AuthService {
     const hashed = await bcrypt.hash(dto.password, 10);
     const user = await this.prisma.user.create({
       data: {
-        email: dto.email,
         password: hashed,
         sipUser: dto.sipUser,
         sipPass: dto.sipPass,
@@ -29,16 +28,19 @@ export class AuthService {
   }
 
   async login(dto: LoginDto) {
-    const user = await this.prisma.user.findUnique({ where: { email: dto.email } });
-    if (!user) throw new Error('Invalid credentials');
+    console.log(dto)
+    const user = await this.prisma.agent.findFirst({ where: { sipUname: dto.email } });
+
+    console.log(user)
+    if (!user) throw new BadRequestException('Invalid credentials');
     const valid = await bcrypt.compare(dto.password, user.password);
-    await this.prisma.user.update({ where: { id: user.id }, data: { status: AgentStatus.AVAILABLE } });
 
-    if (!valid) throw new Error('Invalid credentials');
+    if (!valid) throw new BadRequestException('Invalid credentials');
 
-    const token = this.jwt.sign({ sub: user.id });
+    const token = this.jwt.sign({ sub: user.id, user: user }, { secret: process.env.JWT_SECRET, expiresIn: "7d" });
 
-    return { access_token: token };
+    await this.prisma.agent.update({ where: { id: user.id }, data: { status: AgentStatus.AVAILABLE } });
+    return { access_token: token, user: user };
   }
 }
 
