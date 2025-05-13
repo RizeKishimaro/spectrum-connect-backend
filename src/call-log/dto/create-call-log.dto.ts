@@ -1,5 +1,5 @@
 // src/call-log/dto/create-call-log.dto.ts
-import { IsEnum, IsOptional, IsString, IsInt } from 'class-validator'
+import { IsEnum, IsOptional, IsString, IsInt, IsNumber } from 'class-validator'
 import { CallDirection, CallStatus } from '@prisma/client'
 
 export class CreateCallLogDto {
@@ -22,10 +22,10 @@ export class CreateCallLogDto {
 
   @IsOptional()
   @IsString()
-  agentId?: string
+  agentId: string
 
-  @IsString()
-  systemName: string
+  @IsNumber()
+  systemId: number
 
   @IsOptional()
   @IsString()

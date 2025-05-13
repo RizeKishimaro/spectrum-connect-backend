@@ -7,11 +7,25 @@ export class SipProviderService {
   constructor(private prisma: PrismaService) { }
 
   create(data: CreateSIPProviderDto) {
-    return this.prisma.sIPProvider.create({ data });
+    return this.prisma.sIPProvider.create({
+      data: {
+        ...data,
+        CallLimit: +data.CallLimit
+      }
+    });
   }
 
   findAll() {
-    return this.prisma.sIPProvider.findMany();
+    return this.prisma.sIPProvider.findMany({
+      include: {
+        _count: {
+          select: {
+            SystemCompany: true,
+            RTPAddress: true
+          }
+        },
+      }
+    });
   }
 
   findOne(id: string) {

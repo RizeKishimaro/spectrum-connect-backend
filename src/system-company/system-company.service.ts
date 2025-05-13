@@ -7,12 +7,33 @@ export class SystemCompanyService {
   constructor(private prisma: PrismaService) { }
 
   create(data: CreateSystemCompanyDto) {
-    return this.prisma.systemCompany.create({ data });
+    return this.prisma.systemCompany.create({
+      data: {
+        name: data.name,
+        country: data.country,
+        state: data.state,
+        membersCount: data.membersCount,
+        address: data.address,
+        SIPProvider: {
+          connect: {
+            id: data.SIPProviderId
+          }
+        }
+      }
+    });
   }
 
   findAll() {
     return this.prisma.systemCompany.findMany({
-      include: { SIPProvider: true },
+      include: {
+        SIPProvider: true,
+        Agent: {
+          select: {
+            _count: true,
+          }
+        }
+
+      },
     });
   }
 

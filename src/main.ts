@@ -4,11 +4,13 @@ import { CallService } from './call/call.service';
 import { createAgiServer } from './utils/agi/agi-server';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import { AgentService } from './agent/agent.service';
-import { readdir } from 'fs';
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
-  app.enableCors("*")
+  app.enableCors({
+    origin: ['http://localhost:5173', "http://localhost:3001"], // wrap in array just in case
+    credentials: true,
+  });
   const callService = app.get(CallService);
   const agentService = app.get(AgentService);
   createAgiServer(callService, agentService);

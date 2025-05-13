@@ -31,6 +31,9 @@ export class AgentController {
   }
 
   @Get(":id/getOverviewData")
+  getOverviewData(@Param("id") id: string) {
+    return this.agentService.getAgentOverview(id)
+  }
 
   @Patch(':id')
   @ApiResponse({ type: AgentEntity })

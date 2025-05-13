@@ -10,6 +10,7 @@ import { CallLogModule } from './call-log/call-log.module';
 import { SipProviderModule } from './sip-provider/sip-provider.module';
 import { SystemCompanyModule } from './system-company/system-company.module';
 import { RtpAddressModule } from './rtp-address/rtp-address.module';
+import { SystemManagerModule } from './system-manager/system-manager.module';
 
 @Module({
   imports: [
@@ -25,6 +26,7 @@ import { RtpAddressModule } from './rtp-address/rtp-address.module';
     SipProviderModule,
     SystemCompanyModule,
     RtpAddressModule,
+    SystemManagerModule,
   ],
   controllers: [AppController],
   providers: [AppService],

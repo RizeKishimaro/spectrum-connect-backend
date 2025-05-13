@@ -50,12 +50,13 @@ model Subscription {
   user      User     @relation(fields: [userId], references: [id])
   startedAt DateTime @default(now())
   expiresAt DateTime
+  Agent     Agent[]
 }
 
 model Agent {
   id             String        @id @default(cuid())
   name           String
-  profilePicture String
+  profilePicture String?
   sipUname       String        @unique
   sipPassword    String
   password       String
@@ -64,11 +65,15 @@ model Agent {
   phoneNumber    String
   systemCompany  SystemCompany @relation(fields: [systemCompanyId], references: [id])
   SIPTech        SIPTech
+  Subscription   Subscription  @relation(fields: [subscriptionId], references: [id])
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   status          AgentStatus @default(AVAILABLE)
-  updatedAt       DateTime    @updatedAt
   systemCompanyId Int
   CallLog         CallLog[]
+  subscriptionId  String
 }
 
 model SystemCompany {
@@ -91,6 +96,7 @@ model SIPProvider {
   SipPassword   String?
   SipTech       SIPTech
   AccessToken   String?
+  DIDNumber     String
   CallLimit     Int             @default(50)
   EndpointName  String          @unique
   SystemCompany SystemCompany[]
@@ -144,4 +150,27 @@ enum CallStatus {
   FAILED
   MISSED
   TRANSFERRED
+  CONNECTION_ERROR
+  REQUEST_TIMEOUT
+  SIP_FAILURE_CODE
+  INTERNAL_ERROR
+  BUSY
+  REJECTED
+  REDIRECTED
+  UNAVAILABLE
+  NOT_FOUND
+  ADDRESS_INCOMPLETE
+  INCOMPATIBLE_SDP
+  MISSING_SDP
+  AUTHENTICATION_ERROR
+  BYE
+  WEBRTC_ERROR
+  CANCELED
+  NO_ANSWER
+  EXPIRES
+  NO_ACK
+  DIALOG_ERROR
+  USER_DENIED_MEDIA_ACCESS
+  BAD_MEDIA_DESCRIPTION
+  RTP_TIMEOUT
 }

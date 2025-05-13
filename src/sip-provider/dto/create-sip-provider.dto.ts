@@ -1,4 +1,4 @@
-import { IsString, IsInt, IsEnum, IsOptional } from 'class-validator';
+import { IsString, IsInt, IsEnum, IsOptional, IsNotEmpty } from 'class-validator';
 import { SIPTech } from '@prisma/client';
 
 export class CreateSIPProviderDto {
@@ -22,6 +22,10 @@ export class CreateSIPProviderDto {
   @IsString()
   @IsOptional()
   AccessToken: string;
+
+  @IsString()
+  @IsNotEmpty()
+  DIDNumber: string;
 
   @IsInt()
   CallLimit: number;

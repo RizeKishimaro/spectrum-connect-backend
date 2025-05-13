@@ -29,7 +29,7 @@ export function createAgiServer(
 
     await ctx.exec('StartMusicOnHold');
 
-    const dialResult = await ctx.exec('Dial', `${agent.sipUri}`);
+    const dialResult = await ctx.exec('Dial', `${agent.SIPTech}/${agent.sipUname}`);
 
 
     await ctx.exec('StopMusicOnHold');

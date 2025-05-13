@@ -17,6 +17,6 @@ export class CreateSystemCompanyDto {
   state: string;
 
   @IsString()
-  sIPProviderId: string;
+  SIPProviderId: string;
 }
 

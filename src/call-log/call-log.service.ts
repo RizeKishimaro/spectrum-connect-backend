@@ -1,5 +1,5 @@
 // src/call-log/call-log.service.ts
-import { Injectable } from '@nestjs/common'
+import { BadRequestException, Injectable } from '@nestjs/common'
 import { CreateCallLogDto, UpdateCallLogDto } from './dto'
 import { PrismaService } from 'src/utils/prisma/prisma.service'
 
@@ -7,8 +7,29 @@ import { PrismaService } from 'src/utils/prisma/prisma.service'
 export class CallLogService {
   constructor(private prisma: PrismaService) { }
 
-  create(data: CreateCallLogDto) {
-    return this.prisma.callLog.create({ data })
+  async create(data: CreateCallLogDto) {
+    const systemCompany = await this.prisma.systemCompany.findFirst({
+      where: {
+        id: data.systemId
+      },
+      select: {
+        name: true
+      }
+    });
+    if (!systemCompany) throw new BadRequestException("Invalid Company ID")
+    return await this.prisma.callLog.create({
+      data: {
+        hungUpBy: data.hungUpBy || null,
+        status: data.status,
+        direction: data.direction,
+        duration: data.duration,
+        agentId: data.agentId,
+        action: data.action || null,
+        callerId: data.callerId,
+        calleeId: data.calleeId || null,
+        systemName: systemCompany?.name
+      }
+    })
   }
 
   findAll() {
