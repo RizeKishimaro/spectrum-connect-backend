@@ -1,0 +1,88 @@
+{
+  "id": "ukTBmz9bJPEjL_WwOkUr1",
+  "name": "Main IVR",
+  "action": "Playback",
+  "parameter": [
+    "hello-world",
+    {
+      "option": [
+        "default"
+      ]
+    }
+  ],
+  "audioFile": "welcome",
+  "insertDatabase": false,
+  "children": [
+    {
+      "id": "2RmQ1W71H6BHSJYKKQOAL",
+      "name": "Sales Inbound",
+      "action": "PlayWithDTMF",
+      "dtmfKey": "3",
+      "parameter": [
+        "custom-message",
+        {
+          "option": [
+            "value"
+          ]
+        }
+      ],
+      "audioFile": "demo-thanks",
+      "insertDatabase": true,
+      "children": [
+        {
+          "id": "4SrRqm8wN26Th8NgtK8w4",
+          "name": "Agent Transfer to 100",
+          "action": "transfer",
+          "parameter": [
+            "custom-message",
+            {
+              "option": [
+                "value"
+              ]
+            }
+          ],
+          "insertDatabase": false,
+          "children": []
+        }
+      ],
+      "__rd3t": {
+        "id": "5fb6befa-eeab-4319-94b7-d2e5b5098ec9",
+        "depth": 1,
+        "collapsed": false
+      }
+    },
+    {
+      "id": "0C5spsEzn9bMjG2de1_kg",
+      "name": "option 2",
+      "action": "PlayWithDTMF",
+      "dtmfKey": "2",
+      "parameter": [
+        "custom-message",
+        {
+          "option": [
+            "value"
+          ]
+        }
+      ],
+      "audioFile": "call-waiting",
+      "insertDatabase": true,
+      "children": [
+        {
+          "id": "UmBgEwVQ9OaruDAp82NM9",
+          "name": "Transfer support",
+          "action": "transfer",
+          "parameter": [
+            "custom-message",
+            {
+              "option": [
+                "value"
+              ]
+            }
+          ],
+          "insertDatabase": false,
+          "children": []
+        }
+      ]
+    }
+  ]
+}

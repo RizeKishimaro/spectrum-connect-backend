@@ -36,10 +36,10 @@ max_contacts=1
 
   await appendFile(CONFIG_PATH, configBlock, 'utf-8');
 
-  exec('asterisk -rx "pjsip reload"', (err, stdout, stderr) => {
-    if (err) throw new Error(err.message || "Unknown Error")
-    else console.log('💫 Asterisk PJSIP reloaded:\n', stdout);
-  });
+  // exec('asterisk -rx "pjsip reload"', (err, stdout, stderr) => {
+  //   if (err) throw new Error(err.message || "Unknown Error")
+  //   else console.log('💫 Asterisk PJSIP reloaded:\n', stdout);
+  // });
 }
 
 export async function deleteAgentFromPJSIP(sipUname?: string) {

@@ -5,7 +5,7 @@ import * as bcrypt from 'bcrypt';
 import { JwtService } from '@nestjs/jwt';
 import { RegisterDto } from './dto/register.dto';
 import { LoginDto } from './dto/login.dto';
-import { AgentStatus } from '@prisma/client';
+import { AgentStatus, Role } from '@prisma/client';
 
 @Injectable()
 export class AuthService {
@@ -18,6 +18,13 @@ export class AuthService {
     const hashed = await bcrypt.hash(dto.password, 10);
     const user = await this.prisma.user.create({
       data: {
+        email: dto.email,
+        roles: dto.roles as Role,
+        systemCompany: {
+          connect: {
+            id: dto.systemCompanyId
+          }
+        },
         password: hashed,
         sipUser: dto.sipUser,
         sipPass: dto.sipPass,

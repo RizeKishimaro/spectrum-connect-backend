@@ -46,6 +46,11 @@ export class UpdateAgentDto {
   status: AgentStatus;
 
   @ApiProperty()
+  @IsString()
+  @IsNotEmpty()
+  profilePicture: string;
+
+  @ApiProperty()
   @IsNotEmpty()
   systemCompanyId: number;
 }

@@ -2,10 +2,12 @@
 import { BadRequestException, Injectable } from '@nestjs/common'
 import { CreateCallLogDto, UpdateCallLogDto } from './dto'
 import { PrismaService } from 'src/utils/prisma/prisma.service'
+import { AgentStatus, CallStatus } from '@prisma/client';
 
 @Injectable()
 export class CallLogService {
   constructor(private prisma: PrismaService) { }
+
 
   async create(data: CreateCallLogDto) {
     const systemCompany = await this.prisma.systemCompany.findFirst({
@@ -16,11 +18,25 @@ export class CallLogService {
         name: true
       }
     });
-    if (!systemCompany) throw new BadRequestException("Invalid Company ID")
+
+    if (!systemCompany) throw new BadRequestException("Invalid Company ID");
+
+    await this.prisma.agent.update({
+      where: {
+        id: data.agentId
+      },
+      data: {
+        status: AgentStatus.AVAILABLE
+      }
+    });
+
+    // 🌸 Replace spaces in status with underscores
+    const safeStatus = data.status.replace(/\s+/g, "_") as CallStatus;
+
     return await this.prisma.callLog.create({
       data: {
         hungUpBy: data.hungUpBy || null,
-        status: data.status,
+        status: safeStatus,
         direction: data.direction,
         duration: data.duration,
         agentId: data.agentId,
@@ -29,9 +45,8 @@ export class CallLogService {
         calleeId: data.calleeId || null,
         systemName: systemCompany?.name
       }
-    })
+    });
   }
-
   findAll() {
     return this.prisma.callLog.findMany({ include: { agent: true } })
   }

@@ -1,13 +1,26 @@
-import { BadRequestException, Injectable } from '@nestjs/common';
-import { AgentStatus } from '@prisma/client';
+import { BadRequestException, forwardRef, Inject, Injectable } from '@nestjs/common';
+import { AgentStatus, Role, User } from '@prisma/client';
 import { PrismaService } from 'src/utils/prisma/prisma.service';
 import * as bcrypt from 'bcrypt';
-import { CreateAgentDto, UpdateAgentDto } from './dto';
+import { CreateAgentDto, UpdateAgentDto, UpdatePasswordDto } from './dto';
 import { deleteAgentFromPJSIP, writeAgentToPJSIP } from 'src/utils/pjsip-writer';
+import { JwtService } from '@nestjs/jwt';
+import { Agent } from "@prisma/client";
+import { SystemManagerService } from 'src/system-manager/system-manager.service';
+import { agent } from 'supertest';
+import { AMIProvider } from 'src/utils/providers/ami/ami-provider.service';
+import { ExpressRequest } from 'src/types/other';
 
 @Injectable()
 export class AgentService {
-  constructor(private readonly prisma: PrismaService) { }
+
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly jwt: JwtService,
+    private readonly amiService: AMIProvider,
+    @Inject(forwardRef(() => SystemManagerService))
+    private readonly systemService: SystemManagerService
+  ) { }
 
 
   async create(data: CreateAgentDto) {
@@ -24,13 +37,20 @@ export class AgentService {
         sipUname: data.sipUname,
         sipPassword: data.sipPassword,
       });
+      await this.amiService.action({
+        action: "Command",
+        command: "pjsip reload"
+      })
     }
 
     return agent;
   }
 
-  findAll() {
+  findAll(req: User) {
+    const where = req.roles === Role.company_user ? { systemCompany: { User: { id: req.id } } } : {}
+
     return this.prisma.agent.findMany({
+      where,
       include: {
         systemCompany: {
           select: {
@@ -51,14 +71,19 @@ export class AgentService {
       data,
     });
 
-    if (data.SIPTech === 'PJSIP') {
+    if (agent.SIPTech === 'PJSIP') {
+      await deleteAgentFromPJSIP(agent.sipUname);
       await writeAgentToPJSIP({
         sipUname: data.sipUname,
         sipPassword: data.sipPassword,
       });
     }
 
-    return agent;
+    const access_token = this.jwt.sign({ sub: agent.id, user: agent }, { secret: process.env.JWT_SECRET, expiresIn: "7d" });
+    return {
+      user: agent,
+      access_token
+    };
   }
   async remove(id: string) {
     const agent = await this.prisma.agent.findUnique({ where: { id } });
@@ -73,12 +98,47 @@ export class AgentService {
     await deleteAgentFromPJSIP()
     return { message: 'Agent removed successfully~! 💖' };
   }
-  async getAvailableAgent(): Promise<any> {
-    return this.prisma.agent.findFirst({
-      // where: { status: 'AVAILABLE' },
+  // async getAvailableAgent(): Promise<Agent[] | null> {
+  //   return this.prisma.agent.findMany({
+  //     // where: { status: 'AVAILABLE' },
+  //     orderBy: { updatedAt: 'asc' },
+  //   });
+  // }
+
+  async getAvailableAgent(companyId?: number): Promise<Agent[] | []> {
+    const where = companyId ? { systemCompanyId: companyId } : {};
+    const agents = await this.prisma.agent.findMany({
       orderBy: { updatedAt: 'asc' },
+      where
     });
+
+    const aliveAgents: Agent[] = [];
+    if (agents.length === 0) return [];
+
+    for (const agent of agents) {
+      const isAlive = await this.systemService.isPjsipUserOnline(agent.sipUname);
+      if (isAlive) {
+        await this.prisma.agent.update({
+          where: { id: agent.id },
+          data: {
+            status: AgentStatus.AVAILABLE
+          }
+        })
+        aliveAgents.push(agent);
+      } else {
+        await this.prisma.agent.update({
+          where: { id: agent.id },
+          data: {
+            status: AgentStatus.OFFLINE
+          }
+        })
+      }
+    }
+    console.log(aliveAgents)
+
+    return aliveAgents.length > 0 ? aliveAgents : [];
   }
+
   async updateStatus(agentId: string, status: AgentStatus) {
     return this.prisma.agent.update({
       where: { id: agentId },
@@ -87,6 +147,21 @@ export class AgentService {
   }
 
 
+  async updatePassword(body: UpdatePasswordDto, agentId: string) {
+    const { oldPassword, newPassword } = body;
+    const agent = await this.prisma.agent.findUnique({ where: { id: agentId } });
+    if (!agent) throw new BadRequestException('Invalid credentials');
+    const isMatch = await bcrypt.compare(oldPassword, agent.password);
+    if (!isMatch) throw new BadRequestException('Invalid credentials');
+
+    return this.prisma.agent.update({
+      where: { id: agentId },
+      data: {
+        password: newPassword
+      }
+    })
+
+  }
 
   async getAgentOverview(agentId: string) {
     const today = new Date();

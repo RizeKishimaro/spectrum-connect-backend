@@ -27,30 +27,32 @@ model CallLog {
   duration   Int?
   createdAt  DateTime      @default(now())
   updatedAt  DateTime      @updatedAt
-  User       User?         @relation(fields: [userId], references: [id])
   userId     String?
 }
 
 model User {
-  id           String        @id @default(uuid())
-  password     String
-  sipUser      String        @unique
-  sipPass      String
-  status       AgentStatus
-  createdAt    DateTime      @default(now())
-  subscription Subscription?
-  CallLog      CallLog[]
+  id              String        @id @default(uuid())
+  password        String
+  email           String
+  sipUser         String        @unique
+  sipPass         String
+  status          AgentStatus
+  createdAt       DateTime      @default(now())
+  subscription    Subscription?
+  roles           Role
+  systemCompany   SystemCompany @relation(fields: [systemCompanyId], references: [id])
+  systemCompanyId Int           @unique
 }
 
 model Subscription {
-  id        String   @id @default(uuid())
-  type      String // e.g., "basic", "premium"
-  active    Boolean  @default(true)
-  userId    String   @unique
-  user      User     @relation(fields: [userId], references: [id])
-  startedAt DateTime @default(now())
-  expiresAt DateTime
-  Agent     Agent[]
+  id         String   @id @default(uuid())
+  type       String
+  active     Boolean  @default(true)
+  userId     String   @unique
+  agentCount Int
+  user       User     @relation(fields: [userId], references: [id])
+  startedAt  DateTime @default(now())
+  expiresAt  DateTime
 }
 
 model Agent {
@@ -65,27 +67,28 @@ model Agent {
   phoneNumber    String
   systemCompany  SystemCompany @relation(fields: [systemCompanyId], references: [id])
   SIPTech        SIPTech
-  Subscription   Subscription  @relation(fields: [subscriptionId], references: [id])
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  status          AgentStatus @default(AVAILABLE)
+  status          AgentStatus  @default(AVAILABLE)
   systemCompanyId Int
   CallLog         CallLog[]
-  subscriptionId  String
+  ParkedCall      ParkedCall[]
 }
 
 model SystemCompany {
-  id            Int         @id @default(autoincrement())
+  id            Int          @id @default(autoincrement())
   name          String
   membersCount  String
   address       String
   country       String
   state         String
-  SIPProvider   SIPProvider @relation(fields: [sIPProviderId], references: [id])
+  SIPProvider   SIPProvider  @relation(fields: [sIPProviderId], references: [id])
   Agent         Agent[]
   sIPProviderId String
+  ParkedCall    ParkedCall[]
+  User          User?
 }
 
 model SIPProvider {
@@ -103,6 +106,7 @@ model SIPProvider {
   createdAt     DateTime        @default(now())
   updatedAt     DateTime        @updatedAt
   RTPAddress    RTPAddress[]
+  ParkedCall    ParkedCall[]
 }
 
 model RTPAddress {
@@ -121,6 +125,28 @@ model CallSession {
   status    CallStatus
   createdAt DateTime   @default(now())
   updatedAt DateTime   @updatedAt
+}
+
+model ParkedCall {
+  id         String    @id @default(cuid())
+  sipChannel String
+  parkedAt   DateTime  @default(now())
+  unparkedAt DateTime?
+  isActive   Boolean   @default(true)
+
+  agent   Agent?  @relation(fields: [agentId], references: [id])
+  agentId String?
+
+  sIPProvider   SIPProvider? @relation(fields: [sIPProviderId], references: [id])
+  sIPProviderId String?
+
+  DIDNumber String?
+
+  systemCompany   SystemCompany? @relation(fields: [systemCompanyId], references: [id])
+  systemCompanyId Int?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 }
 
 enum SIPTech {
@@ -173,4 +199,9 @@ enum CallStatus {
   USER_DENIED_MEDIA_ACCESS
   BAD_MEDIA_DESCRIPTION
   RTP_TIMEOUT
+}
+
+enum Role {
+  admin
+  company_user
 }

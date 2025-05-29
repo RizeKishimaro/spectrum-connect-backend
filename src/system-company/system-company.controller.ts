@@ -8,6 +8,7 @@ import {
   Delete,
   Put,
   ParseIntPipe,
+  Req,
 } from '@nestjs/common';
 import { ApiTags, ApiBody, ApiResponse } from '@nestjs/swagger';
 import { SystemCompanyService } from './system-company.service';
@@ -27,8 +28,8 @@ export class SystemCompanyController {
 
   @Get()
   @ApiResponse({ status: 200, description: 'List all SystemCompanies' })
-  findAll() {
-    return this.service.findAll();
+  findAll(@Req() req: any) {
+    return this.service.findAll(req.user);
   }
 
   @Get(':id')

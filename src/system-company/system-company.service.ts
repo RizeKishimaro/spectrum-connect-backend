@@ -1,6 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { CreateSystemCompanyDto, UpdateSystemCompanyDto } from './dto';
 import { PrismaService } from 'src/utils/prisma/prisma.service';
+import { Role, User } from '@prisma/client';
 
 @Injectable()
 export class SystemCompanyService {
@@ -23,8 +24,10 @@ export class SystemCompanyService {
     });
   }
 
-  findAll() {
+  findAll(user: User) {
+    const where = user.roles === Role.company_user ? { User: { id: user.id } } : {}
     return this.prisma.systemCompany.findMany({
+      where,
       include: {
         SIPProvider: true,
         Agent: {
