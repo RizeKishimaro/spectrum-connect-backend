@@ -2,6 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { CreateSystemCompanyDto, UpdateSystemCompanyDto } from './dto';
 import { PrismaService } from 'src/utils/prisma/prisma.service';
 import { Role, User } from '@prisma/client';
+import { Prisma } from '@prisma/client';
 
 @Injectable()
 export class SystemCompanyService {
@@ -24,8 +25,13 @@ export class SystemCompanyService {
     });
   }
 
+
   findAll(user: User) {
-    const where = user.roles === Role.company_user ? { User: { id: user.id } } : {}
+    const where: Prisma.SystemCompanyWhereInput =
+      user.roles === Role.company_user
+        ? { User: { some: { id: user.id } } }
+        : {};
+
     return this.prisma.systemCompany.findMany({
       where,
       include: {
@@ -33,9 +39,8 @@ export class SystemCompanyService {
         Agent: {
           select: {
             _count: true,
-          }
-        }
-
+          },
+        },
       },
     });
   }

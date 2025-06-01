@@ -7,9 +7,9 @@ import { deleteAgentFromPJSIP, writeAgentToPJSIP } from 'src/utils/pjsip-writer'
 import { JwtService } from '@nestjs/jwt';
 import { Agent } from "@prisma/client";
 import { SystemManagerService } from 'src/system-manager/system-manager.service';
-import { agent } from 'supertest';
 import { AMIProvider } from 'src/utils/providers/ami/ami-provider.service';
 import { ExpressRequest } from 'src/types/other';
+import { Prisma } from '@prisma/client';
 
 @Injectable()
 export class AgentService {
@@ -46,20 +46,25 @@ export class AgentService {
     return agent;
   }
 
+
   findAll(req: User) {
-    const where = req.roles === Role.company_user ? { systemCompany: { User: { id: req.id } } } : {}
+    const where: Prisma.AgentWhereInput =
+      req.roles === Role.company_user
+        ? { systemCompany: { User: { some: { id: req.id } } } }
+        : {};
 
     return this.prisma.agent.findMany({
       where,
       include: {
         systemCompany: {
           select: {
-            name: true
-          }
-        }
-      }
+            name: true,
+          },
+        },
+      },
     });
   }
+
 
   findOne(id: string) {
     return this.prisma.agent.findUnique({ where: { id } });

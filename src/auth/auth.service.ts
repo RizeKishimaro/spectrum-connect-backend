@@ -15,16 +15,13 @@ export class AuthService {
   ) { }
 
   async register(dto: RegisterDto) {
+    console.log(dto)
     const hashed = await bcrypt.hash(dto.password, 10);
     const user = await this.prisma.user.create({
       data: {
         email: dto.email,
         roles: dto.roles as Role,
-        systemCompany: {
-          connect: {
-            id: dto.systemCompanyId
-          }
-        },
+        systemCompanyId: +dto.systemCompanyId,
         password: hashed,
         sipUser: dto.sipUser,
         sipPass: dto.sipPass,

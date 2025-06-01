@@ -9,6 +9,7 @@ import {
   Put,
   HttpCode,
   HttpStatus,
+  Req,
 } from '@nestjs/common'
 import { ApiTags, ApiOperation, ApiResponse, ApiBody, ApiParam } from '@nestjs/swagger'
 import { CallLogService } from './call-log.service'
@@ -31,8 +32,8 @@ export class CallLogController {
   @Get()
   @ApiOperation({ summary: 'List all call logs~ 🗂️' })
   @ApiResponse({ status: 200, description: 'List of call logs~ 💖', type: [Object] })
-  findAll() {
-    return this.service.findAll()
+  findAll(@Req() req: any) {
+    return this.service.findAll(req.user)
   }
 
   @Get(':id')

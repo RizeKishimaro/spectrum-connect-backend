@@ -26,7 +26,30 @@ export class UserService {
   }
 
   async getAllUsers() {
-    const users = await this.prisma.user.findMany({})
+    const users = await this.prisma.user.findMany({
+      include: {
+        systemCompany: true
+      }
+    })
     return users
+  }
+
+  async getUser(id: string) {
+    const user = await this.prisma.user.findUnique({ where: { id } })
+    return user
+  }
+
+  async updateUser(id: string, data: any) {
+    const user = await this.prisma.user.update({ where: { id }, data })
+    return user
+  }
+
+  async removeUser(id: string) {
+    const user = await this.prisma.user.delete({
+      where: {
+        id
+      }
+    })
+    return user;
   }
 }

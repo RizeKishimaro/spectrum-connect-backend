@@ -18,6 +18,7 @@ import { PrismaModule } from './utils/prisma/prisma.module';
 import { SubscriptionsModule } from './subscriptions/subscriptions.module';
 import { APP_GUARD } from '@nestjs/core';
 import { AuthGuard } from './utils/guards/jwt.guard';
+import { PaginationModule } from './utils/providers/pagination/pagination.module';
 
 @Module({
   imports: [
@@ -27,6 +28,7 @@ import { AuthGuard } from './utils/guards/jwt.guard';
     AuthModule,
     AmiModule,
     PrismaModule,
+    PaginationModule,
     JwtModule.register({
       secret: process.env.JWT_SECRET,
       signOptions: { expiresIn: '7d' },

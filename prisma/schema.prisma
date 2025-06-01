@@ -41,7 +41,7 @@ model User {
   subscription    Subscription?
   roles           Role
   systemCompany   SystemCompany @relation(fields: [systemCompanyId], references: [id])
-  systemCompanyId Int           @unique
+  systemCompanyId Int
 }
 
 model Subscription {
@@ -88,7 +88,7 @@ model SystemCompany {
   Agent         Agent[]
   sIPProviderId String
   ParkedCall    ParkedCall[]
-  User          User?
+  User          User[]
 }
 
 model SIPProvider {
