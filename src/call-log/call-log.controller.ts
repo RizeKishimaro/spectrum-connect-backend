@@ -32,8 +32,9 @@ export class CallLogController {
   @Get()
   @ApiOperation({ summary: 'List all call logs~ 🗂️' })
   @ApiResponse({ status: 200, description: 'List of call logs~ 💖', type: [Object] })
-  findAll(@Req() req: any) {
-    return this.service.findAll(req.user)
+  async findAll(@Req() req: any) {
+    const data = await this.service.findAll(req.user)
+    return data
   }
 
   @Get(':id')

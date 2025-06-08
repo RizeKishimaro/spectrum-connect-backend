@@ -5,6 +5,6 @@ import { PrismaService } from 'src/utils/prisma/prisma.service';
 
 @Module({
   controllers: [RtpAddressController],
-  providers: [RtpAddressService, PrismaService],
+  providers: [RtpAddressService],
 })
 export class RtpAddressModule { }

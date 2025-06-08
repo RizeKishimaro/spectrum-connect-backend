@@ -5,7 +5,7 @@ import { ParkedCallController } from './parked-call.controller';
 
 @Module({
   controllers: [ParkedCallController],
-  providers: [ParkedCallService, PrismaService],
+  providers: [ParkedCallService],
 })
 export class ParkedCallModule { }
 

@@ -1,6 +1,18 @@
-import { ApiProperty } from '@nestjs/swagger';
+
+import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { AgentStatus, SIPTech } from '@prisma/client';
-import { IsEnum, IsNotEmpty, IsString } from 'class-validator';
+import { IsEnum, IsNotEmpty, IsOptional, IsString, ValidateNested, IsObject } from 'class-validator';
+import { Type } from 'class-transformer';
+
+class PJSIPSectionDto {
+  @ApiProperty()
+  @IsString()
+  name: string;
+
+  @ApiProperty({ type: Object })
+  @IsObject()
+  config: Record<string, any>;
+}
 
 export class CreateAgentDto {
   @ApiProperty()
@@ -26,7 +38,7 @@ export class CreateAgentDto {
   @ApiProperty()
   @IsEnum(SIPTech)
   @IsNotEmpty()
-  SIPTech: SIPTech
+  SIPTech: SIPTech;
 
   @ApiProperty()
   @IsString()
@@ -51,5 +63,24 @@ export class CreateAgentDto {
   @ApiProperty()
   @IsNotEmpty()
   systemCompanyId: number;
+
+  // 🎀 Optional PJSIP config sections
+  @ApiPropertyOptional({ type: PJSIPSectionDto })
+  @ValidateNested()
+  @Type(() => PJSIPSectionDto)
+  @IsOptional()
+  endpoint?: PJSIPSectionDto;
+
+  @ApiPropertyOptional({ type: PJSIPSectionDto })
+  @ValidateNested()
+  @Type(() => PJSIPSectionDto)
+  @IsOptional()
+  auth?: PJSIPSectionDto;
+
+  @ApiPropertyOptional({ type: PJSIPSectionDto })
+  @ValidateNested()
+  @Type(() => PJSIPSectionDto)
+  @IsOptional()
+  aor?: PJSIPSectionDto;
 }
 

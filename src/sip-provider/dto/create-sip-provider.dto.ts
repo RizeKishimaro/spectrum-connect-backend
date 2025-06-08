@@ -1,5 +1,15 @@
-import { IsString, IsInt, IsEnum, IsOptional, IsNotEmpty } from 'class-validator';
+
+import { IsString, IsInt, IsEnum, IsOptional, IsNotEmpty, ValidateNested } from 'class-validator';
 import { SIPTech } from '@prisma/client';
+import { Type } from 'class-transformer';
+
+class PJSIPSectionConfig {
+  @IsString()
+  name: string;
+
+  @IsNotEmpty()
+  config: Record<string, any>;
+}
 
 export class CreateSIPProviderDto {
   @IsString()
@@ -17,7 +27,7 @@ export class CreateSIPProviderDto {
   SipPassword: string;
 
   @IsEnum(SIPTech)
-  SipTech: SIPTech;
+  sipTech: SIPTech;
 
   @IsString()
   @IsOptional()
@@ -32,5 +42,27 @@ export class CreateSIPProviderDto {
 
   @IsString()
   EndpointName: string;
+
+  // 🌟 Add these cuties:
+  @ValidateNested()
+  @Type(() => PJSIPSectionConfig)
+  endpoint: PJSIPSectionConfig;
+
+  @ValidateNested()
+  @Type(() => PJSIPSectionConfig)
+  auth: PJSIPSectionConfig;
+
+  @ValidateNested()
+  @Type(() => PJSIPSectionConfig)
+  aor: PJSIPSectionConfig;
+
+  @ValidateNested()
+  @Type(() => PJSIPSectionConfig)
+  identify: PJSIPSectionConfig;
+
+  @ValidateNested()
+  @Type(() => PJSIPSectionConfig)
+  contact: PJSIPSectionConfig;
 }
+
 

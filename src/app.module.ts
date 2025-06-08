@@ -22,11 +22,12 @@ import { PaginationModule } from './utils/providers/pagination/pagination.module
 
 @Module({
   imports: [
+
+    AmiModule,
     ScheduleModule.forRoot(),
     CallModule,
     UserModule,
     AuthModule,
-    AmiModule,
     PrismaModule,
     PaginationModule,
     JwtModule.register({

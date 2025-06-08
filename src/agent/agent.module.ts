@@ -17,7 +17,7 @@ import { SystemManagerModule } from 'src/system-manager/system-manager.module';
     forwardRef(() => SystemManagerModule)
   ],
   controllers: [AgentController],
-  providers: [AgentService, PrismaService, JwtService, SystemManagerService, ParkedCallService],
+  providers: [AgentService, JwtService, SystemManagerService, ParkedCallService],
   exports: [AgentService],
 })
 export class AgentModule { }

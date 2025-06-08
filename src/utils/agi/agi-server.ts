@@ -31,9 +31,6 @@ export function createAgiServer(
   async function handleIVRNode(ctx: any, node: IVRNode) {
     const did = ctx.variables['dnid']
     const company = await prismaService.sIPProvider.findFirst({
-      where: {
-        DIDNumber: did
-      },
     })
     switch (node.action) {
       case 'Playback':

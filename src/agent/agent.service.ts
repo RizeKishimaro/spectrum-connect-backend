@@ -10,6 +10,7 @@ import { SystemManagerService } from 'src/system-manager/system-manager.service'
 import { AMIProvider } from 'src/utils/providers/ami/ami-provider.service';
 import { ExpressRequest } from 'src/types/other';
 import { Prisma } from '@prisma/client';
+import { buildPJSIPDTOFromCreateAgentData } from 'src/utils/pjsip/pjsip-helper';
 
 @Injectable()
 export class AgentService {
@@ -23,30 +24,60 @@ export class AgentService {
   ) { }
 
 
+
   async create(data: CreateAgentDto) {
-    const password = await bcrypt.hash(data.sipPassword, 10)
+    const password = await bcrypt.hash(data.sipPassword, 10);
+
+    // 🍡 Create base Agent
     const agent = await this.prisma.agent.create({
       data: {
-        ...data,
-        password: password
-      }
-    });
-
-    if (data.SIPTech === 'PJSIP') {
-      await writeAgentToPJSIP({
+        name: data.name,
         sipUname: data.sipUname,
         sipPassword: data.sipPassword,
+        password,
+        firstName: data.firstName,
+        lastName: data.lastName,
+        phoneNumber: data.phoneNumber,
+        status: data.status,
+        SIPTech: data.SIPTech,
+        systemCompanyId: data.systemCompanyId,
+      },
+    });
+
+    // 🍥 Store PJSIP settings separately
+    if (data.SIPTech === 'PJSIP') {
+      await this.prisma.agentPJSIPConfig.create({
+        data: {
+          agentId: agent.id,
+          endpoint: data.endpoint?.config ?? {},
+          auth: data.auth?.config ?? {},
+          aor: data.aor?.config ?? {},
+        },
       });
+
+      await writeAgentToPJSIP({
+        endpoint: {
+          name: data.endpoint?.name ?? data.sipUname,
+          config: data.endpoint?.config ?? {},
+        },
+        auth: {
+          name: data.auth?.name ?? `${data.sipUname}-auth`,
+          config: data.auth?.config ?? {},
+        },
+        aor: {
+          name: data.aor?.name ?? data.sipUname,
+          config: data.aor?.config ?? {},
+        }
+      });
+
       await this.amiService.action({
         action: "Command",
         command: "pjsip reload"
-      })
+      });
     }
 
     return agent;
   }
-
-
   findAll(req: User) {
     const where: Prisma.AgentWhereInput =
       req.roles === Role.company_user
@@ -76,19 +107,19 @@ export class AgentService {
       data,
     });
 
-    if (agent.SIPTech === 'PJSIP') {
-      await deleteAgentFromPJSIP(agent.sipUname);
-      await writeAgentToPJSIP({
-        sipUname: data.sipUname,
-        sipPassword: data.sipPassword,
-      });
-    }
+    // if (agent.SIPTech === 'PJSIP') {
+    //   await deleteAgentFromPJSIP(agent.sipUname);
+    //   await writeAgentToPJSIP({
+    //     sipUname: data.sipUname,
+    //     sipPassword: data.sipPassword,
+    //   });
+    // }
 
-    const access_token = this.jwt.sign({ sub: agent.id, user: agent }, { secret: process.env.JWT_SECRET, expiresIn: "7d" });
-    return {
-      user: agent,
-      access_token
-    };
+    // const access_token = this.jwt.sign({ sub: agent.id, user: agent }, { secret: process.env.JWT_SECRET, expiresIn: "7d" });
+    // return {
+    //   user: agent,
+    //   access_token
+    // };
   }
   async remove(id: string) {
     const agent = await this.prisma.agent.findUnique({ where: { id } });
@@ -99,9 +130,9 @@ export class AgentService {
 
     await this.prisma.agent.delete({ where: { id } });
 
-    await deleteAgentFromPJSIP(agent.sipUname);
-    await deleteAgentFromPJSIP()
-    return { message: 'Agent removed successfully~! 💖' };
+    // await deleteAgentFromPJSIP(agent.sipUname);
+    // await deleteAgentFromPJSIP()
+    // return { message: 'Agent removed successfully~! 💖' };
   }
   // async getAvailableAgent(): Promise<Agent[] | null> {
   //   return this.prisma.agent.findMany({

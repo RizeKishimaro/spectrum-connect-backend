@@ -5,6 +5,6 @@ import { PrismaService } from 'src/utils/prisma/prisma.service';
 
 @Module({
   controllers: [CallLogController],
-  providers: [CallLogService, PrismaService],
+  providers: [CallLogService],
 })
 export class CallLogModule { }

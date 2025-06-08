@@ -71,10 +71,24 @@ model Agent {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  status          AgentStatus  @default(AVAILABLE)
-  systemCompanyId Int
-  CallLog         CallLog[]
-  ParkedCall      ParkedCall[]
+  status           AgentStatus       @default(AVAILABLE)
+  systemCompanyId  Int
+  CallLog          CallLog[]
+  ParkedCall       ParkedCall[]
+  AgentPJSIPConfig AgentPJSIPConfig?
+}
+
+model AgentPJSIPConfig {
+  id      String @id @default(cuid())
+  agentId String @unique
+  agent   Agent  @relation(fields: [agentId], references: [id])
+
+  endpoint Json
+  auth     Json
+  aor      Json
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 }
 
 model SystemCompany {
@@ -92,21 +106,27 @@ model SystemCompany {
 }
 
 model SIPProvider {
-  id            String          @id @default(uuid())
-  IpHost        String          @db.Inet
-  IpRange       String
-  SipUsername   String?
-  SipPassword   String?
-  SipTech       SIPTech
-  AccessToken   String?
-  DIDNumber     String
-  CallLimit     Int             @default(50)
-  EndpointName  String          @unique
+  id            String             @id @default(cuid())
+  name          String?
+  description   String?
+  sipTech       String
+  createdAt     DateTime           @default(now())
+  updatedAt     DateTime           @updatedAt
+  config        SIPProviderConfig?
   SystemCompany SystemCompany[]
-  createdAt     DateTime        @default(now())
-  updatedAt     DateTime        @updatedAt
   RTPAddress    RTPAddress[]
   ParkedCall    ParkedCall[]
+}
+
+model SIPProviderConfig {
+  id            String      @id @default(cuid())
+  sipProviderId String      @unique
+  endpoint      Json
+  auth          Json
+  aor           Json
+  identify      Json
+  contact       Json
+  SIPProvider   SIPProvider @relation(fields: [sipProviderId], references: [id])
 }
 
 model RTPAddress {

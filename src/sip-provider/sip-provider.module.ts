@@ -5,6 +5,6 @@ import { PrismaService } from 'src/utils/prisma/prisma.service';
 
 @Module({
   controllers: [SipProviderController],
-  providers: [SipProviderService, PrismaService],
+  providers: [SipProviderService,],
 })
 export class SipProviderModule { }

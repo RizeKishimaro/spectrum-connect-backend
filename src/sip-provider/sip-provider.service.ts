@@ -1,19 +1,46 @@
 import { Injectable } from '@nestjs/common';
 import { CreateSIPProviderDto, UpdateSIPProviderDto } from './dto';
 import { PrismaService } from 'src/utils/prisma/prisma.service';
+import { writeProviderToPJSIP } from 'src/utils/pjsip-writer';
 
 @Injectable()
 export class SipProviderService {
   constructor(private prisma: PrismaService) { }
 
-  create(data: CreateSIPProviderDto) {
-    return this.prisma.sIPProvider.create({
+
+  async create(data: CreateSIPProviderDto) {
+    const { endpoint, auth, aor, identify, contact, ...providerData } = data;
+
+    const sipProvider = await this.prisma.sIPProvider.create({
       data: {
-        ...data,
-        CallLimit: +data.CallLimit
+        ...providerData,
+      },
+    });
+
+
+    await this.prisma.sIPProviderConfig.create({
+      data: {
+        sipProviderId: sipProvider.id,
+        endpoint: { ...endpoint },
+        auth: { ...auth },
+        aor: { ...aor },
+        identify: { ...identify },
+        contact: { ...contact },
       }
     });
+
+
+    await writeProviderToPJSIP({
+      endpoint,
+      auth,
+      aor,
+      identify,
+      contact,
+    });
+
+    return sipProvider;
   }
+
 
   findAll() {
     return this.prisma.sIPProvider.findMany({
