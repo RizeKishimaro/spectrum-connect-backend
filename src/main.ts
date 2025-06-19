@@ -12,10 +12,10 @@ import { PrismaService } from './utils/prisma/prisma.service';
 
 async function bootstrap() {
   const app = await NestFactory.create<NestExpressApplication>(AppModule);
-  const allowedOrigins = process.env.ALLOWED_ORIGINS?.split(',') ?? []
+  const allowedOrigins = process.env.ALLOWED_ORIGINS?.split(',') || [];
+
   app.enableCors({
-    origin: allowedOrigins, // wrap in array just in case
-    // origin: "*",
+    origin: allowedOrigins,
     credentials: true,
   });
   app.useStaticAssets(join(process.cwd(), 'public'));

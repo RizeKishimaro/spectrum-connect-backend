@@ -10,6 +10,7 @@ import {
   HttpCode,
   HttpStatus,
   Req,
+  Query,
 } from '@nestjs/common'
 import { ApiTags, ApiOperation, ApiResponse, ApiBody, ApiParam } from '@nestjs/swagger'
 import { CallLogService } from './call-log.service'
@@ -32,8 +33,8 @@ export class CallLogController {
   @Get()
   @ApiOperation({ summary: 'List all call logs~ 🗂️' })
   @ApiResponse({ status: 200, description: 'List of call logs~ 💖', type: [Object] })
-  async findAll(@Req() req: any) {
-    const data = await this.service.findAll(req.user)
+  async findAll(@Req() req: any, @Query('page') page: number = 1, @Query('limit') limit: number = 10) {
+    const data = await this.service.findAll(req.user, page, +limit)
     return data
   }
 

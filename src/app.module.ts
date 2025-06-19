@@ -5,7 +5,6 @@ import { CallModule } from './call/call.module';
 import { UserModule } from './user/user.module';
 import { AuthModule } from './auth/auth.module';
 import { JwtModule } from '@nestjs/jwt';
-import { AgentModule } from './agent/agent.module';
 import { CallLogModule } from './call-log/call-log.module';
 import { SipProviderModule } from './sip-provider/sip-provider.module';
 import { SystemCompanyModule } from './system-company/system-company.module';
@@ -19,10 +18,17 @@ import { SubscriptionsModule } from './subscriptions/subscriptions.module';
 import { APP_GUARD } from '@nestjs/core';
 import { AuthGuard } from './utils/guards/jwt.guard';
 import { PaginationModule } from './utils/providers/pagination/pagination.module';
+import { SmsModule } from './sms/sms.module';
+import { BullModule } from '@nestjs/bullmq';
 
 @Module({
   imports: [
-
+    BullModule.forRoot({
+      connection: {
+        host: 'localhost',
+        port: 6379,
+      },
+    }),
     AmiModule,
     ScheduleModule.forRoot(),
     CallModule,
@@ -40,7 +46,8 @@ import { PaginationModule } from './utils/providers/pagination/pagination.module
     RtpAddressModule,
     SystemManagerModule,
     ParkedCallModule,
-    SubscriptionsModule
+    SubscriptionsModule,
+    SmsModule
   ],
   controllers: [AppController],
   providers: [

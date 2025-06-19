@@ -44,6 +44,26 @@ model User {
   systemCompanyId Int
 }
 
+model SmsLog {
+  id        String        @id @default(cuid())
+  sender    String
+  numbers   String
+  content   String
+  route     Int
+  status    String?
+  success   Int
+  failed    Int
+  charged   Float?
+  apiRaw    Json
+  company   SystemCompany @relation(fields: [systemCompanyId], references: [id])
+  direction String?
+
+  createdAt       DateTime @default(now())
+  systemCompanyId Int
+
+  @@map("sms_logs")
+}
+
 model Subscription {
   id         String   @id @default(uuid())
   type       String
@@ -91,6 +111,23 @@ model AgentPJSIPConfig {
   updatedAt DateTime @updatedAt
 }
 
+model IVRTree {
+  id              String        @id @default(cuid())
+  tree            Json
+  company         SystemCompany @relation(fields: [systemCompanyId], references: [id])
+  systemCompanyId Int
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+}
+
+model IvrFiles {
+  id        String @id @default(cuid())
+  file_name String
+  file_size Int
+  file_type String
+  file_url  String
+}
+
 model SystemCompany {
   id            Int          @id @default(autoincrement())
   name          String
@@ -103,6 +140,8 @@ model SystemCompany {
   sIPProviderId String
   ParkedCall    ParkedCall[]
   User          User[]
+  SmsLog        SmsLog[]
+  IVRTree       IVRTree[]
 }
 
 model SIPProvider {
