@@ -39,7 +39,7 @@ export class AgentService {
         lastName: data.lastName,
         phoneNumber: data.phoneNumber,
         status: data.status,
-        SIPTech: data.SIPTech,
+        sipTech: data.SIPTech,
         systemCompanyId: data.systemCompanyId,
       },
     });
