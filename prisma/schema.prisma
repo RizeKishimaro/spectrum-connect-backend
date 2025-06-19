@@ -86,7 +86,7 @@ model Agent {
   lastName       String
   phoneNumber    String
   systemCompany  SystemCompany @relation(fields: [systemCompanyId], references: [id])
-  SIPTech        SIPTech
+  SipTech        String        @default("pjsip")
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
