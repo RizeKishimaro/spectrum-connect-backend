@@ -30,6 +30,7 @@ export class SmsProcessor extends WorkerHost {
       console.log("📡 Sending SMS:", url);
       const res = await axios.get(url);
 
+
       await this.prisma.smsLog.create({
         data: {
           sender,
@@ -37,12 +38,15 @@ export class SmsProcessor extends WorkerHost {
           numbers: Array.isArray(numbers) ? numbers.join(',') : numbers,
           content,
           route,
-          status: res.data.status ?? "failed",
-          success: res.data.success || 0,
+          status:
+            res.data.status === 1 || res.data.success === true
+              ? "sent"
+              : "failed",
+          success: res.data.success ?? res.data.sent ?? 0,
           failed: res.data.fail ?? res.data.failed ?? 0,
           charged: parseFloat(res.data.charged ?? '0'),
           apiRaw: res.data,
-          direction: "outbound"
+          direction: "outbound",
         },
       });
       console.log("📡 SMS sent:",);
@@ -51,6 +55,22 @@ export class SmsProcessor extends WorkerHost {
       return { status: 'sent', };
     } catch (err) {
       console.error('💥 SMS sending failed:', err);
+      await this.prisma.smsLog.create({
+        data: {
+          sender,
+          systemCompanyId: companyId,
+          numbers: Array.isArray(numbers) ? numbers.join(',') : numbers,
+          content,
+          route,
+          status: "failed",
+          success: 0,
+          failed: 1,
+          charged: parseFloat(err.data.charged ?? '0'),
+          apiRaw: err.data,
+          direction: "outbound"
+        },
+      });
+
       throw err;
     }
   }
