@@ -39,7 +39,6 @@ export class SmsController {
       limit: Number(query.limit) || 10,
       orderBy: { createdAt: 'desc' },
     })
-    console.log(data)
     const returnData = {
       ...data,
       direction: "outbound"

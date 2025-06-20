@@ -14,7 +14,6 @@ export class SmsService {
       API_KEY: process.env.SMS_API_KEY,
       API_ROUTE: process.env.SMS_API_URL
     })
-    console.log("da!")
     return { status: 'queued', data }
   }
 }
