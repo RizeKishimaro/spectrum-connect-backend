@@ -14,10 +14,7 @@ async function bootstrap() {
   const app = await NestFactory.create<NestExpressApplication>(AppModule);
   const allowedOrigins = process.env.ALLOWED_ORIGINS?.split(',') || [];
 
-  app.enableCors({
-    origin: allowedOrigins,
-    credentials: true,
-  });
+  app.enableCors();
   app.useStaticAssets(join(process.cwd(), 'public'));
   const callService = app.get(CallService);
   const agentService = app.get(AgentService);
@@ -34,6 +31,6 @@ async function bootstrap() {
 
   const document = SwaggerModule.createDocument(app, config);
   SwaggerModule.setup('api-docs', app, document); // visit: http://localhost:3000/api-docs
-  await app.listen(process.env.PORT ?? 3000);
+  await app.listen(process.env.PORT ?? 8000);
 }
 bootstrap();
