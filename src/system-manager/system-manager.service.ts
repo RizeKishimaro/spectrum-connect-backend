@@ -134,7 +134,6 @@ export class SystemManagerService {
   }
 
   saveIVRTree(body: { name: string, tree: IvrNode }) {
-    console.log(body)
     const uniquename = body.name + "-" + Date.now()
     // const content = generateDialplan(body.tree, uniquename);
     // writeDialplanToFile(content, join("/etc/asterisk/", "extensions-custom.conf"));

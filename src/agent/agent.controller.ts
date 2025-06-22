@@ -22,8 +22,8 @@ export class AgentController {
 
   @Post()
   @ApiResponse({ type: AgentEntity })
-  create(@Body() createAgentDto: CreateAgentDto) {
-    return this.agentService.create(createAgentDto);
+  create(@Body() createAgentDto: CreateAgentDto, @Req() req: ExpressRequest) {
+    return this.agentService.create(createAgentDto, req.user.id);
   }
 
   @Get()

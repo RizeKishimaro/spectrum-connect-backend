@@ -14,6 +14,7 @@ export class SipProviderService {
     const sipProvider = await this.prisma.sIPProvider.create({
       data: {
         ...providerData,
+        SipTech: data.sipTech
       },
     });
 

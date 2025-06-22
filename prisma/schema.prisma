@@ -1,9 +1,3 @@
-// This is your Prisma schema file,
-// learn more about it in the docs: https://pris.ly/d/prisma-schema
-
-// Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?
-// Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
-
 generator client {
   provider = "prisma-client-js"
 }
@@ -16,108 +10,107 @@ datasource db {
 model CallLog {
   id         String        @id @default(cuid())
   callerId   String
+  action     String?
+  createdAt  DateTime      @default(now())
+  agentId    String?
   calleeId   String?
   direction  CallDirection
-  status     CallStatus
-  action     String?
-  agentId    String?
-  agent      Agent?        @relation(fields: [agentId], references: [id])
-  systemName String
-  hungUpBy   String?
   duration   Int?
-  createdAt  DateTime      @default(now())
+  hungUpBy   String?
+  status     CallStatus
+  systemName String
   updatedAt  DateTime      @updatedAt
   userId     String?
+  agent      Agent?        @relation(fields: [agentId], references: [id])
 }
 
 model User {
   id              String        @id @default(uuid())
+  name            String        @default("System User")
   password        String
-  email           String
   sipUser         String        @unique
   sipPass         String
-  status          AgentStatus
   createdAt       DateTime      @default(now())
-  subscription    Subscription?
+  status          AgentStatus
+  email           String
   roles           Role
-  systemCompany   SystemCompany @relation(fields: [systemCompanyId], references: [id])
   systemCompanyId Int
+  subscription    Subscription?
+  systemCompany   SystemCompany @relation(fields: [systemCompanyId], references: [id])
 }
 
 model SmsLog {
-  id        String        @id @default(cuid())
-  sender    String
-  numbers   String
-  content   String
-  route     Int
-  status    String?
-  success   Int
-  failed    Int
-  charged   Float?
-  apiRaw    Json
-  company   SystemCompany @relation(fields: [systemCompanyId], references: [id])
-  direction String?
-
-  createdAt       DateTime @default(now())
+  id              String        @id @default(cuid())
+  sender          String
+  numbers         String
+  content         String
+  route           Int
+  status          String?
+  success         Int
+  failed          Int
+  charged         Float?
+  apiRaw          Json
+  createdAt       DateTime      @default(now())
   systemCompanyId Int
+  direction       String?
+  company         SystemCompany @relation(fields: [systemCompanyId], references: [id])
 
   @@map("sms_logs")
 }
 
 model Subscription {
-  id         String   @id @default(uuid())
-  type       String
-  active     Boolean  @default(true)
-  userId     String   @unique
-  agentCount Int
-  user       User     @relation(fields: [userId], references: [id])
-  startedAt  DateTime @default(now())
-  expiresAt  DateTime
+  id              String   @id @default(uuid())
+  type            String
+  active          Boolean  @default(true)
+  userId          String   @unique
+  startedAt       DateTime @default(now())
+  expiresAt       DateTime
+  agentCount      Int
+  description     String?
+  isSMSSubscribed Boolean  @default(false)
+  user            User     @relation(fields: [userId], references: [id])
 }
 
 model Agent {
-  id             String        @id @default(cuid())
-  name           String
-  profilePicture String?
-  sipUname       String        @unique
-  sipPassword    String
-  password       String
-  firstName      String
-  lastName       String
-  phoneNumber    String
-  systemCompany  SystemCompany @relation(fields: [systemCompanyId], references: [id])
-  sipTech        String        @default("pjsip") @map("SipTech")
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
+  id               String            @id @default(cuid())
+  name             String
   status           AgentStatus       @default(AVAILABLE)
+  updatedAt        DateTime          @updatedAt
+  firstName        String
+  lastName         String
+  phoneNumber      String
+  sipPassword      String
+  sipUname         String            @unique
   systemCompanyId  Int
+  password         String
+  profilePicture   String?
+  createdAt        DateTime          @default(now())
+  sipTech          String            @default("pjsip") @map("SipTech")
+  systemCompany    SystemCompany     @relation(fields: [systemCompanyId], references: [id])
+  AgentPJSIPConfig AgentPJSIPConfig?
   CallLog          CallLog[]
   ParkedCall       ParkedCall[]
-  AgentPJSIPConfig AgentPJSIPConfig?
 }
 
 model AgentPJSIPConfig {
-  id      String @id @default(cuid())
-  agentId String @unique
-  agent   Agent  @relation(fields: [agentId], references: [id])
-
-  endpoint Json
-  auth     Json
-  aor      Json
-
+  id        String   @id @default(cuid())
+  agentId   String   @unique
+  endpoint  Json
+  auth      Json
+  aor       Json
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+  agent     Agent    @relation(fields: [agentId], references: [id])
 }
 
 model IVRTree {
   id              String        @id @default(cuid())
+  name            String
   tree            Json
-  company         SystemCompany @relation(fields: [systemCompanyId], references: [id])
   systemCompanyId Int
   createdAt       DateTime      @default(now())
   updatedAt       DateTime      @updatedAt
+  company         SystemCompany @relation(fields: [systemCompanyId], references: [id])
 }
 
 model IvrFiles {
@@ -135,26 +128,26 @@ model SystemCompany {
   address       String
   country       String
   state         String
-  SIPProvider   SIPProvider  @relation(fields: [sIPProviderId], references: [id])
-  Agent         Agent[]
   sIPProviderId String
+  Agent         Agent[]
+  IVRTree       IVRTree[]
   ParkedCall    ParkedCall[]
+  SIPProvider   SIPProvider  @relation(fields: [sIPProviderId], references: [id])
   User          User[]
   SmsLog        SmsLog[]
-  IVRTree       IVRTree[]
 }
 
 model SIPProvider {
   id            String             @id @default(cuid())
-  name          String?
-  description   String?
-  sipTech       String
   createdAt     DateTime           @default(now())
   updatedAt     DateTime           @updatedAt
+  description   String?
+  name          String?
+  SipTech       String             @default("pjsip") @map("SipTech")
+  ParkedCall    ParkedCall[]
+  RTPAddress    RTPAddress[]
   config        SIPProviderConfig?
   SystemCompany SystemCompany[]
-  RTPAddress    RTPAddress[]
-  ParkedCall    ParkedCall[]
 }
 
 model SIPProviderConfig {
@@ -172,40 +165,35 @@ model RTPAddress {
   id            String      @id @default(cuid())
   RTPAddress    String
   Name          String
-  Remark        String      @db.Text
-  SIPProvider   SIPProvider @relation(fields: [sIPProviderId], references: [id])
+  Remark        String
   sIPProviderId String
+  SIPProvider   SIPProvider @relation(fields: [sIPProviderId], references: [id])
 }
 
 model CallSession {
   id        String     @id @default(cuid())
   callerId  String
-  type      String
   status    CallStatus
   createdAt DateTime   @default(now())
+  type      String
   updatedAt DateTime   @updatedAt
 }
 
 model ParkedCall {
-  id         String    @id @default(cuid())
-  sipChannel String
-  parkedAt   DateTime  @default(now())
-  unparkedAt DateTime?
-  isActive   Boolean   @default(true)
-
-  agent   Agent?  @relation(fields: [agentId], references: [id])
-  agentId String?
-
-  sIPProvider   SIPProvider? @relation(fields: [sIPProviderId], references: [id])
-  sIPProviderId String?
-
-  DIDNumber String?
-
-  systemCompany   SystemCompany? @relation(fields: [systemCompanyId], references: [id])
+  id              String         @id @default(cuid())
+  sipChannel      String
+  parkedAt        DateTime       @default(now())
+  unparkedAt      DateTime?
+  isActive        Boolean        @default(true)
+  agentId         String?
+  sIPProviderId   String?
+  DIDNumber       String?
   systemCompanyId Int?
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  createdAt       DateTime       @default(now())
+  updatedAt       DateTime       @updatedAt
+  agent           Agent?         @relation(fields: [agentId], references: [id])
+  sIPProvider     SIPProvider?   @relation(fields: [sIPProviderId], references: [id])
+  systemCompany   SystemCompany? @relation(fields: [systemCompanyId], references: [id])
 }
 
 enum SIPTech {
@@ -228,13 +216,6 @@ enum AgentStatus {
 }
 
 enum CallStatus {
-  WAITING
-  RINGING
-  CONNECTED
-  HUNGUP
-  FAILED
-  MISSED
-  TRANSFERRED
   CONNECTION_ERROR
   REQUEST_TIMEOUT
   SIP_FAILURE_CODE
@@ -258,6 +239,13 @@ enum CallStatus {
   USER_DENIED_MEDIA_ACCESS
   BAD_MEDIA_DESCRIPTION
   RTP_TIMEOUT
+  WAITING
+  RINGING
+  CONNECTED
+  HUNGUP
+  FAILED
+  MISSED
+  TRANSFERRED
 }
 
 enum Role {
