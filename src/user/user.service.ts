@@ -13,7 +13,7 @@ export class UserService {
   ) { }
 
   async login(dto: LoginDto) {
-    const user = await this.prisma.user.findFirst({ where: { email: dto.email } });
+    const user = await this.prisma.user.findFirst({ where: { email: dto.email }, include: { subscription: true } });
 
     if (!user) throw new BadRequestException('Invalid credentials');
     const valid = await bcrypt.compare(dto.password, user.password);

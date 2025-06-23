@@ -1,5 +1,6 @@
 
 import { BadRequestException, InternalServerErrorException } from '@nestjs/common';
+import { IVRTree } from '@prisma/client';
 import * as fs from 'fs';
 import * as path from 'path';
 
@@ -145,10 +146,10 @@ export function generateDialplan(root: IvrNode, contextName = 'ivr-main'): strin
 }
 
 // --- Write dialplan to file ---
-export function writeDialplanToFile(content: string, filename = 'ivr-dialplan.conf') {
+export function writeDialplanToFile(content: string) {
   const filePath = path.join(path.join("/etc/asterisk", "extensions_custom.conf"));
   console.log(filePath)
-  fs.writeFileSync(filePath, content);
+  fs.appendFileSync(filePath, '\n' + content);
   console.log(`📁 Dialplan saved to ${filePath} ~ UwU`);
 }
 
@@ -174,5 +175,31 @@ export function saveIvrDialplan(rootIvrNode: IvrNode, contextName = 'ivr-main') 
     console.error("⚠️ Error saving IVR dialplan:", err);
     throw new InternalServerErrorException("Something went wrong while saving IVR")
   }
+}
+export async function deleteIVRTree(IVR: IVRTree) {
+
+  const contextName = IVR.name;
+  const filePath = path.join("/etc/asterisk/extensions_custom.conf");
+
+  const content = fs.readFileSync(filePath, "utf-8");
+  const regex = new RegExp(`\\[${contextName}\\][\\s\\S]*?(?=\\n\\[|$)`, "g");
+
+  const newContent = content.replace(regex, '').trim();
+
+  fs.writeFileSync(filePath, newContent + "\n");
+
+  const { exec } = await import("child_process");
+  exec("asterisk -rx 'dialplan reload'", (err, stdout, stderr) => {
+    if (err) {
+      console.error("❌ Dialplan reload failed:", stderr);
+    } else {
+      console.log("🔁 Dialplan reloaded:\n" + stdout);
+    }
+  });
+
+  return {
+    status: "success",
+    message: `IVR "${contextName}" has been erased from time and space~ 💣🩷`,
+  };
 }
 

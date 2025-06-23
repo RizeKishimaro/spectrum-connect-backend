@@ -1,4 +1,4 @@
-import { BadRequestException, Body, Controller, Get, Post, Query, UploadedFile, UseInterceptors } from '@nestjs/common';
+import { BadRequestException, Body, Controller, Get, Post, Query, Req, UploadedFile, UseInterceptors } from '@nestjs/common';
 import { SystemManagerService } from './system-manager.service';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { diskStorage } from 'multer';
@@ -6,6 +6,7 @@ import { extname, join } from 'path';
 import { v4 as uuidv4 } from 'uuid';
 import ffmpeg from 'fluent-ffmpeg';
 import * as fs from 'fs';
+import { ExpressRequest } from 'src/types/other';
 
 @Controller('system-manager')
 export class SystemManagerController {
@@ -34,8 +35,9 @@ export class SystemManagerController {
   }
 
   @Post("saveIVRTree")
-  async saveIVRTree(@Body() body: any) {
-    this.systemManagerService.saveIVRTree(body)
+  async saveIVRTree(@Body() body: any, @Req() req: ExpressRequest) {
+    console.log(req)
+    this.systemManagerService.saveIVRTree(body, req.user.user.systemCompanyId)
     return body
   }
 

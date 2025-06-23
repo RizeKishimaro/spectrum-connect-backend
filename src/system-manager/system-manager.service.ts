@@ -3,11 +3,12 @@ import { Interval } from '@nestjs/schedule';
 import ManagerFactory from 'asterisk-manager';
 import { AgentService } from 'src/agent/agent.service';
 import { ParkedCallService } from 'src/parked-call/parked-call.service';
-import { generateDialplan, IvrNode, saveIvrDialplan, writeDialplanToFile } from 'src/utils/dialplan/dialplan-manager';
+import { deleteIVRTree, generateDialplan, IvrNode, saveIvrDialplan, writeDialplanToFile } from 'src/utils/dialplan/dialplan-manager';
 import { extname, join } from 'path';
 import ffmpeg from 'fluent-ffmpeg';
 import * as fs from 'fs';
 import { PrismaService } from 'src/utils/prisma/prisma.service';
+import { ExpressRequest } from 'src/types/other';
 
 @Injectable()
 export class SystemManagerService {
@@ -133,16 +134,39 @@ export class SystemManagerService {
     }
   }
 
-  saveIVRTree(body: { name: string, tree: IvrNode }) {
+  async saveIVRTree(body: { name: string, tree: IvrNode }, systemCompanyId: ExpressRequest['user']['user']['systemCompanyId']) {
     const uniquename = body.name + "-" + Date.now()
     // const content = generateDialplan(body.tree, uniquename);
     // writeDialplanToFile(content, join("/etc/asterisk/", "extensions-custom.conf"));
+    await this.prismaService.iVRTree.create({
+      data: {
+        name: uniquename,
+        tree: JSON.stringify(body.tree),
+        systemCompanyId: systemCompanyId
+      }
+    })
+
     saveIvrDialplan(body.tree, uniquename)
     return {
       status: "success",
       statusCode: HttpStatus.OK,
       message: "Saved IVR Tree to dialplan."
     }
+  }
+
+  async deleteIVRTree(id: string, systemCompanyId: number) {
+    const ivr = await this.prismaService.iVRTree.findUnique({
+      where: { id, systemCompanyId },
+    });
+    if (!ivr || (ivr.systemCompanyId !== systemCompanyId)) {
+      throw new BadRequestException("IVR not found or access denied! (｡•́︿•̀｡)");
+    }
+    deleteIVRTree(ivr)
+    await this.prismaService.iVRTree.delete({
+      where: { id, systemCompanyId },
+    });
+
+
   }
 
   saveIVRFiles(file: Express.Multer.File) {

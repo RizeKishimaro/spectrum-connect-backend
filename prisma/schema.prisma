@@ -114,11 +114,15 @@ model IVRTree {
 }
 
 model IvrFiles {
-  id        String @id @default(cuid())
-  file_name String
-  file_size Int
-  file_type String
-  file_url  String
+  id              String        @id @default(cuid())
+  file_name       String
+  file_size       Int
+  file_type       String
+  file_url        String
+  company         SystemCompany @relation(fields: [systemCompanyId], references: [id])
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+  systemCompanyId Int
 }
 
 model SystemCompany {
@@ -135,6 +139,7 @@ model SystemCompany {
   SIPProvider   SIPProvider  @relation(fields: [sIPProviderId], references: [id])
   User          User[]
   SmsLog        SmsLog[]
+  IvrFiles      IvrFiles[]
 }
 
 model SIPProvider {
