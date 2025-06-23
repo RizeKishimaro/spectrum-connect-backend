@@ -134,23 +134,56 @@ export class SystemManagerService {
     }
   }
 
-  async saveIVRTree(body: { name: string, tree: IvrNode }, systemCompanyId: ExpressRequest['user']['user']['systemCompanyId']) {
-    const uniquename = body.name + "-" + Date.now()
-    // const content = generateDialplan(body.tree, uniquename);
-    // writeDialplanToFile(content, join("/etc/asterisk/", "extensions-custom.conf"));
-    await this.prismaService.iVRTree.create({
-      data: {
-        name: uniquename,
-        tree: JSON.stringify(body.tree),
-        systemCompanyId: systemCompanyId
-      }
-    })
+  async saveIVRTree(
+    body: { id?: string; name: string; tree: IvrNode },
+    systemCompanyId: number
+  ) {
+    const isUpdate = !!body.id;
+    const timestampedName = `${body.name}-${Date.now()}`;
+    const jsonTree = JSON.stringify(body.tree);
 
-    saveIvrDialplan(body.tree, uniquename)
-    return {
-      status: "success",
-      statusCode: HttpStatus.OK,
-      message: "Saved IVR Tree to dialplan."
+    if (isUpdate) {
+      const existing = await this.prismaService.iVRTree.findUnique({
+        where: { id: body.id },
+      });
+
+      if (!existing) {
+        throw new BadRequestException("IVR not found for update, nya~!");
+      }
+
+      await deleteIVRTree(existing);
+
+      const updated = await this.prismaService.iVRTree.update({
+        where: { id: body.id },
+        data: {
+          name: timestampedName,
+          tree: jsonTree,
+        },
+      });
+
+      saveIvrDialplan(body.tree, timestampedName);
+
+      return {
+        status: "success",
+        message: `IVR Tree updated successfully nya~!`,
+        data: updated,
+      };
+    } else {
+      const created = await this.prismaService.iVRTree.create({
+        data: {
+          name: timestampedName,
+          tree: jsonTree,
+          systemCompanyId,
+        },
+      });
+
+      saveIvrDialplan(body.tree, timestampedName);
+
+      return {
+        status: "success",
+        message: `IVR Tree created successfully~ 💖`,
+        data: created,
+      };
     }
   }
 
@@ -165,11 +198,17 @@ export class SystemManagerService {
     await this.prismaService.iVRTree.delete({
       where: { id, systemCompanyId },
     });
-
-
+    this.ami.action({
+      Action: "Command",
+      Command: "pjsip reload"
+    })
+    return {
+      status: HttpStatus.OK,
+      message: "Successfully Deleted IVR Node",
+    }
   }
 
-  saveIVRFiles(file: Express.Multer.File) {
+  saveIVRFiles(file: Express.Multer.File, systemCompanyId) {
     const outputDir = join(process.cwd(), 'public', 'sounds')
 
     const outputFilename = file.originalname
@@ -197,8 +236,9 @@ export class SystemManagerService {
               data: {
                 file_name: outputFilename,
                 file_size: stats.size,
-                file_type: 'audio/wav', // It's now WAV after conversion
+                file_type: file.mimetype,
                 file_url: publicUrl,
+                company: systemCompanyId
               },
             })
 
@@ -215,6 +255,27 @@ export class SystemManagerService {
         })
         .save(outputPath)
     })
+  }
+  async getIVRTree(systemCompanyId: number) {
+    const ivrTreeName = await this.prismaService.iVRTree.findMany({
+      where: {
+        systemCompanyId,
+      },
+      select: {
+        name: true,
+        id: true
+      }
+    })
+    return ivrTreeName
+  }
+  async findIVRNode(id: string, systemCompanyId: number) {
+    const ivrNode = await this.prismaService.iVRTree.findUnique({
+      where: {
+        id,
+        systemCompanyId,
+      }
+    })
+    return ivrNode
   }
 
   async getIvrFiles() {

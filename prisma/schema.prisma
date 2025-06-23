@@ -105,12 +105,14 @@ model AgentPJSIPConfig {
 
 model IVRTree {
   id              String        @id @default(cuid())
-  name            String
+  name            String        @unique
   tree            Json
   systemCompanyId Int
   createdAt       DateTime      @default(now())
   updatedAt       DateTime      @updatedAt
   company         SystemCompany @relation(fields: [systemCompanyId], references: [id])
+
+  @@index([name, id, systemCompanyId])
 }
 
 model IvrFiles {

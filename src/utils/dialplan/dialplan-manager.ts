@@ -187,19 +187,11 @@ export async function deleteIVRTree(IVR: IVRTree) {
   const newContent = content.replace(regex, '').trim();
 
   fs.writeFileSync(filePath, newContent + "\n");
-
-  const { exec } = await import("child_process");
-  exec("asterisk -rx 'dialplan reload'", (err, stdout, stderr) => {
-    if (err) {
-      console.error("❌ Dialplan reload failed:", stderr);
-    } else {
-      console.log("🔁 Dialplan reloaded:\n" + stdout);
-    }
-  });
-
   return {
     status: "success",
     message: `IVR "${contextName}" has been erased from time and space~ 💣🩷`,
   };
 }
+
+
 
