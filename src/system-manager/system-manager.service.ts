@@ -1,4 +1,4 @@
-import { BadRequestException, forwardRef, HttpStatus, Inject, Injectable, InternalServerErrorException, NotFoundException } from '@nestjs/common';
+import { BadGatewayException, BadRequestException, forwardRef, HttpStatus, Inject, Injectable, InternalServerErrorException, NotFoundException } from '@nestjs/common';
 import { Interval } from '@nestjs/schedule';
 import ManagerFactory from 'asterisk-manager';
 import { AgentService } from 'src/agent/agent.service';
@@ -139,7 +139,7 @@ export class SystemManagerService {
     systemCompanyId: number
   ) {
     const isUpdate = !!body.id;
-    const timestampedName = `${body.name}-${Date.now()}`;
+    const timestampedName = `${body.name}}`;
     const jsonTree = JSON.stringify(body.tree);
 
     if (isUpdate) {
@@ -156,12 +156,12 @@ export class SystemManagerService {
       const updated = await this.prismaService.iVRTree.update({
         where: { id: body.id },
         data: {
-          name: timestampedName,
+          name: existing.name,
           tree: jsonTree,
         },
       });
 
-      saveIvrDialplan(body.tree, timestampedName);
+      saveIvrDialplan(body.tree, existing.name);
 
       return {
         status: "success",
@@ -169,6 +169,12 @@ export class SystemManagerService {
         data: updated,
       };
     } else {
+      const tree = await this.prismaService.iVRTree.findUnique({
+        where: {
+          name: body.name
+        }
+      });
+      if (tree) throw new BadRequestException("Duplicated Name Please choose Another")
       const created = await this.prismaService.iVRTree.create({
         data: {
           name: timestampedName,

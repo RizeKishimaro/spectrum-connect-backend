@@ -6,7 +6,7 @@
 */
 -- AlterTable
 ALTER TABLE "SIPProvider" DROP COLUMN "sipTech",
-ADD COLUMN     "SipTech" TEXT NOT NULL DEFAULT 'pjsip';
+-- ADD COLUMN     "SipTech" TEXT NOT NULL DEFAULT 'pjsip';
 
 -- AlterTable
 ALTER TABLE "Subscription" ADD COLUMN     "isSMSSubscribed" BOOLEAN;

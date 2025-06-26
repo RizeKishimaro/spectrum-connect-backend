@@ -19,6 +19,7 @@ export class SystemManagerController {
     const pjsipPeers = await this.systemManagerService.sendCommand('pjsip show endpoints');
     const systemVersion = await this.systemManagerService.sendCommand('core show version');
     const response = await this.systemManagerService.checkPing()
+    console.log(channels, uptime, pjsipPeers, systemVersion, response)
 
     return {
       systemVersion,

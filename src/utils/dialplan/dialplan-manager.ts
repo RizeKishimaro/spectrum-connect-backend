@@ -148,7 +148,6 @@ export function generateDialplan(root: IvrNode, contextName = 'ivr-main'): strin
 // --- Write dialplan to file ---
 export function writeDialplanToFile(content: string) {
   const filePath = path.join(path.join("/etc/asterisk", "extensions_custom.conf"));
-  console.log(filePath)
   fs.appendFileSync(filePath, '\n' + content);
   console.log(`📁 Dialplan saved to ${filePath} ~ UwU`);
 }
@@ -162,11 +161,11 @@ export function saveIvrDialplan(rootIvrNode: IvrNode, contextName = 'ivr-main') 
 
     const conflicts = findConflicts(existingExts, rootIvrNode, contextName, false); // context may be new!
 
-    console.log(conflicts)
     if (conflicts.length) {
       conflicts.forEach(err => console.error("❌", err));
       throw new BadRequestException("Conflicts detected in extensions.conf! Fix them before saving, nya~!");
     }
+    console.log(conflicts)
 
     const dialplanContent = generateDialplan(rootIvrNode, contextName);
     writeDialplanToFile(dialplanContent);
