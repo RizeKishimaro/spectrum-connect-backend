@@ -1,0 +1,2 @@
+-- AlterTable
+ALTER TABLE "SIPProvider" ADD COLUMN     "IpHost" TEXT NOT NULL DEFAULT '0.0.0.0';

@@ -150,6 +150,7 @@ model SIPProvider {
   updatedAt     DateTime           @updatedAt
   description   String?
   name          String?
+  IpHost        String             @default("0.0.0.0")
   SipTech       String             @default("pjsip") @map("SipTech")
   ParkedCall    ParkedCall[]
   RTPAddress    RTPAddress[]

@@ -39,7 +39,7 @@ export class SmsProcessor extends WorkerHost {
           content,
           route,
           status:
-            res.data.status === 1 || res.data.success === true
+            res.data.success === 1 || res.data.success === true
               ? "sent"
               : "failed",
           success: res.data.success ?? res.data.sent ?? 0,
