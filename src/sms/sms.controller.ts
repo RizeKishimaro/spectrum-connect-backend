@@ -18,7 +18,6 @@ export class SmsController {
 
   @Post('send')
   async sendSms(@Body() dto: SendSmsDto, @Req() req: any) {
-    console.log(dto, req.user)
     const response = this.smsService.sendSms({
       companyId: req.user.user.systemCompanyId,
       route: dto.route,

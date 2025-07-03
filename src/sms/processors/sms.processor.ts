@@ -12,7 +12,6 @@ export class SmsProcessor extends WorkerHost {
   }
 
   async process(job: Job): Promise<any> {
-    console.log("📡 Processing SMS job:", job.name, job.data);
 
     if (job.name !== 'send') {
       console.warn(`⚠️ Unknown job name: ${job.name}`);
@@ -20,14 +19,13 @@ export class SmsProcessor extends WorkerHost {
     }
     console.log(job.data, process.env.SMS_API_KEY, process.env.SMS_API_URL)
 
-    const { content, companyId, numbers, sender, route, API_KEY, API_ROUTE } = job.data;
+    const { message, companyId, numbers, sender, route, API_KEY, API_ROUTE } = job.data;
     const url = `${API_ROUTE}?API_KEY=${API_KEY}&route=${route}
 &action=sendmessage&numbers=${Array.isArray(numbers) ? numbers.join(',') : numbers}
-&content=${encodeURIComponent(content)}
+&content=${encodeURIComponent(message)}
 &sender=${sender}`;
 
     try {
-      console.log("📡 Sending SMS:", url);
       const res = await axios.get(url);
 
 
@@ -36,7 +34,7 @@ export class SmsProcessor extends WorkerHost {
           sender,
           systemCompanyId: companyId,
           numbers: Array.isArray(numbers) ? numbers.join(',') : numbers,
-          content,
+          content: message,
           route,
           status:
             res.data.success === 1 || res.data.success === true
@@ -49,7 +47,6 @@ export class SmsProcessor extends WorkerHost {
           direction: "outbound",
         },
       });
-      console.log("📡 SMS sent:",);
 
       // return res.data;
       return { status: 'sent', };
@@ -60,7 +57,7 @@ export class SmsProcessor extends WorkerHost {
           sender,
           systemCompanyId: companyId,
           numbers: Array.isArray(numbers) ? numbers.join(',') : numbers,
-          content,
+          content: message,
           route,
           status: "failed",
           success: 0,

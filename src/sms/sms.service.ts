@@ -25,10 +25,15 @@ export class SmsService {
   }
 
   async sendSms(data) {
+    console.log(data.content)
     const processedMessage = this.replaceRandomPlaceholders(data.content);
 
     await this.smsQueue.add('send', {
       ...data,
+      numbers: data.numbers,
+      sender: data.sender,
+      route: data.route,
+      companyId: data.companyId,
       message: processedMessage,
       API_KEY: process.env.SMS_API_KEY,
       API_ROUTE: process.env.SMS_API_URL
