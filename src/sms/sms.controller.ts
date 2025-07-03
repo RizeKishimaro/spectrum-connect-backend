@@ -1,12 +1,14 @@
 
 // sms.controller.ts
-import { Controller, Get, Post, Query, Param, Body, Req } from '@nestjs/common'
+import { Controller, Get, Post, Query, Param, Body, Req, BadRequestException } from '@nestjs/common'
 import { SmsService } from './sms.service'
 import { SendSmsDto } from './dto/sms.dto'
 import { PaginationService } from 'src/utils/providers/pagination/pagination.service'
 import { PrismaService } from 'src/utils/prisma/prisma.service'
 import { BasicQuery } from 'src/utils/dto/query.dto'
 import { ExpressRequest } from 'src/types/other'
+import { randomUUID } from 'crypto'
+import { PublicRoute } from 'src/utils/decorators/public.decorator'
 
 @Controller('sms')
 export class SmsController {
@@ -16,8 +18,17 @@ export class SmsController {
     private prisma: PrismaService, // adjust if using another ORM
   ) { }
 
-  @Post('send')
+  @Post('limitless/send')
   async sendSms(@Body() dto: SendSmsDto, @Req() req: any) {
+
+    const subscription = await this.prisma.subscription.findFirst({
+      where: {
+        userId: req.user.user.id
+      }
+    })
+    if (!subscription) {
+      throw new BadRequestException('Subscription not found')
+    }
     const response = this.smsService.sendSms({
       companyId: req.user.user.systemCompanyId,
       route: dto.route,
@@ -32,6 +43,54 @@ export class SmsController {
       response
     }
   }
+  @Post("teliqon/send")
+  async sendTeliqonSMS(@Body() dto: SendSmsDto, @Req() req: ExpressRequest) {
+    const subscription = await this.prisma.subscription.findFirst({
+      where: {
+        userId: req.user.user.id
+      }
+    })
+    if (!subscription) {
+      throw new BadRequestException('Subscription not found')
+    }
+
+    const response = this.smsService.sendTeliqon({
+      companyId: req.user.user.systemCompanyId,
+      route: dto.route,
+      action: 'sendmessage',
+      content: dto.message,
+      numbers: dto.numbers,
+      sender: dto.sender
+    })
+    return response
+  }
+
+
+  @PublicRoute()
+  @Post("teliqon/test")
+  async testSend(@Body() body: SendSmsDto) {
+    const numbers = Array.isArray(body.numbers)
+      ? body.numbers
+      : typeof body.numbers === 'string'
+        ? [body.numbers]
+        : ['12345678901'];
+
+    const data = {};
+
+    for (const number of numbers) {
+      data[number] = [
+        {
+          id_state: randomUUID(),
+        },
+      ];
+    }
+
+    return {
+      status: true,
+      data,
+    };
+  }
+
 
 
   @Get()
@@ -52,6 +111,7 @@ export class SmsController {
       {},
       where
     );
+    console
 
     return {
       ...data,

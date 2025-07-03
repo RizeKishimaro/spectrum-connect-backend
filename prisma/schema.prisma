@@ -68,6 +68,7 @@ model Subscription {
   agentCount      Int
   description     String?
   isSMSSubscribed Boolean  @default(false)
+  smsBalance      Float    @default(0.00)
   user            User     @relation(fields: [userId], references: [id])
 }
 

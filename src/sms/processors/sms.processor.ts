@@ -5,68 +5,105 @@ import { Job } from 'bullmq';
 import axios from 'axios';
 import { PrismaService } from 'src/utils/prisma/prisma.service';
 
-@Processor('sms') // 💖 Register this class as a worker for the "sms" queue
+@Processor('limitless', {
+  concurrency: 10
+}) // 💖 Register this class as a worker for the "sms" queue
 export class SmsProcessor extends WorkerHost {
   constructor(private readonly prisma: PrismaService) {
     super();
   }
 
   async process(job: Job): Promise<any> {
-
-    if (job.name !== 'send') {
+    if (job.name !== "send") {
       console.warn(`⚠️ Unknown job name: ${job.name}`);
       return;
     }
-    console.log(job.data, process.env.SMS_API_KEY, process.env.SMS_API_URL)
 
-    const { message, companyId, numbers, sender, route, API_KEY, API_ROUTE } = job.data;
-    const url = `${API_ROUTE}?API_KEY=${API_KEY}&route=${route}
-&action=sendmessage&numbers=${Array.isArray(numbers) ? numbers.join(',') : numbers}
-&content=${encodeURIComponent(message)}
-&sender=${sender}`;
+    const {
+      message,
+      companyId,
+      numbers, // single number string here!
+      sender,
+      route,
+      API_KEY,
+      API_ROUTE,
+      smsLogId, // the log to update
+    } = job.data;
+    console.log("sending sms", job)
+
+    const url = `${API_ROUTE}?API_KEY=${API_KEY}` +
+      `&route=${route}` +
+      `&action=sendmessage` +
+      `&numbers=${encodeURIComponent(numbers)}` +
+      `&content=${encodeURIComponent(message)}` +
+      `&sender=${encodeURIComponent(sender)}`;
 
     try {
       const res = await axios.get(url);
+      const data = res.data;
+      console.log(data, res)
 
+      let sent = 0;
+      let failed = 0;
+      let charged = 0;
+      let status = "failed";
 
-      await this.prisma.smsLog.create({
+      if (route === 1) {
+        sent = data.success ?? 0;
+        failed = data.fail ?? 0;
+        charged = parseFloat(data.charged ? (data.charged * 2).toString() : "0");
+        status = sent > 0 ? "sent" : "failed";
+      } else {
+        sent = data.sent ?? (data.success === true ? 1 : 0);
+        failed = data.failed ?? (data.success === false ? 1 : 0);
+        charged = parseFloat(data.charged ?? "0");
+        status = sent > 0 ? "sent" : "failed";
+      }
+
+      // Update single SMS log status
+      await this.prisma.smsLog.update({
+        where: { id: smsLogId },
         data: {
-          sender,
-          systemCompanyId: companyId,
-          numbers: Array.isArray(numbers) ? numbers.join(',') : numbers,
-          content: message,
-          route,
-          status:
-            res.data.success === 1 || res.data.success === true
-              ? "sent"
-              : "failed",
-          success: res.data.success ?? res.data.sent ?? 0,
-          failed: res.data.fail ?? res.data.failed ?? 0,
-          charged: parseFloat(res.data.charged ?? '0'),
-          apiRaw: res.data,
-          direction: "outbound",
+          status,
+          success: sent,
+          failed,
+          charged,
+          apiRaw: data,
         },
       });
-
-      // return res.data;
-      return { status: 'sent', };
+      console.log("sms sent")
+      return { status: "sent" };
     } catch (err) {
-      console.error('💥 SMS sending failed:', err);
-      await this.prisma.smsLog.create({
+      console.error("💥 SMS sending failed:", err);
+
+      const smsData = await this.prisma.smsLog.update({
+        where: { id: smsLogId },
         data: {
-          sender,
-          systemCompanyId: companyId,
-          numbers: Array.isArray(numbers) ? numbers.join(',') : numbers,
-          content: message,
-          route,
           status: "failed",
           success: 0,
           failed: 1,
-          charged: parseFloat(err.data.charged ?? '0'),
-          apiRaw: err.data,
-          direction: "outbound"
+          charged: 0,
+          apiRaw: err?.response?.data || {},
         },
       });
+      const user = await this.prisma.user.findFirst({
+        where: {
+          systemCompany: {
+            id: smsData.systemCompanyId
+          }
+        }
+      })
+      await this.prisma.subscription.update({
+        where: {
+          userId: user?.id
+        },
+        data: {
+          smsBalance: {
+            decrement: smsData.charged || 0
+          }
+        }
+      })
+
 
       throw err;
     }

@@ -4,14 +4,17 @@ import { InjectQueue } from '@nestjs/bull'
 import { Queue } from 'bullmq'
 import { SendSmsDto } from './dto/sms.dto'
 import { randomBytes } from 'crypto';
+import { PrismaService } from 'src/utils/prisma/prisma.service';
 
 @Injectable()
 export class SmsService {
-  constructor(@InjectQueue('sms') private smsQueue: Queue) { }
+  constructor(
+    @InjectQueue('limitless') private smsQueue: Queue,
+    @InjectQueue('teliqon') private teliqonQueue: Queue,
+    private readonly prisma: PrismaService
+  ) { }
 
   generateBase64String(length: number): string {
-    // Base64 expands every 3 bytes to 4 characters
-    // So we need to calculate how many bytes are needed
     const byteLength = Math.ceil((length * 3) / 4);
     return randomBytes(byteLength).toString('base64').slice(0, length);
   }
@@ -24,22 +27,121 @@ export class SmsService {
       .replace(/{{rad_64}}/g, () => this.generateBase64String(64));
   }
 
+
   async sendSms(data) {
-    console.log(data.content)
-    const processedMessage = this.replaceRandomPlaceholders(data.content);
+    const numberList = Array.isArray(data.numbers)
+      ? data.numbers
+      : typeof data.numbers === "string"
+        ? data.numbers.split(",").map(n => n.trim())
+        : [];
 
-    await this.smsQueue.add('send', {
-      ...data,
-      numbers: data.numbers,
-      sender: data.sender,
-      route: data.route,
-      companyId: data.companyId,
-      message: processedMessage,
-      API_KEY: process.env.SMS_API_KEY,
-      API_ROUTE: process.env.SMS_API_URL
-    });
+    if (numberList.length === 0) {
+      console.log("bad phone number")
+      throw new Error("No valid numbers provided nya~!");
+    }
 
-    return { status: 'queued', data: { ...data, message: processedMessage } };
+    const pendingLogs = await Promise.all(
+
+      numberList.map(async (phone) => {
+        const processedMessage = this.replaceRandomPlaceholders(data.content);
+        console.log(processedMessage)
+        return await this.prisma.smsLog.create({
+          data: {
+            sender: data.sender,
+            systemCompanyId: data.companyId,
+            numbers: phone,
+            content: processedMessage,
+            route: data.route,
+            status: "pending",
+            success: 0,
+            failed: 0,
+            charged: 0,
+            apiRaw: {},
+            direction: "outbound",
+          },
+        })
+      })
+    );
+
+    // const processedMessage = this.replaceRandomPlaceholders(data.content);
+    for (let i = 0; i < numberList.length; i++) {
+      console.log("sending sms logs")
+      const { phone, processedMessage, logId } = pendingLogs[i];
+      await this.smsQueue.add("send", {
+        ...data,
+        numbers: [phone],
+        message: processedMessage,
+        API_KEY: process.env.SMS_API_KEY,
+        API_ROUTE: process.env.TELIQON_SMS_API_URL,
+        smsLogId: logId,
+      });
+    }
+
+    return {
+      status: "queued",
+      count: numberList.length,
+    };
+  }
+
+
+  async sendTeliqon(data: any) {
+    const numberList = Array.isArray(data.numbers)
+      ? data.numbers
+      : typeof data.numbers === "string"
+        ? data.numbers.split(",").map((n) => n.trim()).filter(n => n.length > 0)
+        : [];
+
+    if (numberList.length === 0) {
+      console.log("📵 Bad phone number list");
+      throw new Error("No valid numbers provided nya~!");
+    }
+
+
+
+    const pendingLogs = await Promise.all(
+      numberList.map(async (phone) => {
+        const processedMessage = this.replaceRandomPlaceholders(data.content); // 💎 Generate unique per number
+        const log = await this.prisma.smsLog.create({
+          data: {
+            sender: data.sender,
+            systemCompanyId: data.companyId,
+            numbers: phone,
+            content: processedMessage,
+            route: data.route,
+            status: "pending",
+            success: 0,
+            failed: 0,
+            charged: 0,
+            apiRaw: {},
+            direction: "outbound",
+          },
+        });
+
+        return {
+          phone,
+          processedMessage,
+          logId: log.id,
+        };
+      })
+    );
+
+    // ⏳ Queue one job per number, with its own message
+    for (let i = 0; i < pendingLogs.length; i++) {
+      const { phone, processedMessage, logId } = pendingLogs[i];
+      console.log(`📤 Queuing SMS to ${phone}`);
+      await this.teliqonQueue.add("send", {
+        ...data,
+        numbers: [phone],
+        message: processedMessage,
+        API_KEY: process.env.TELEQON_SMS_API_KEY,
+        API_ROUTE: process.env.TELIQON_SMS_API_URL,
+        smsLogId: logId,
+      });
+    }
+    return {
+      status: "queued",
+      count: numberList.length,
+    };
   }
 
 }

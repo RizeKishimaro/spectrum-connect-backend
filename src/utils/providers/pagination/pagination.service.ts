@@ -59,19 +59,20 @@ export class PaginationService {
 
     const where = {
       ...this.buildWhereCondition(filterModel, filterKeyword, searchKeyword, searchColumns),
-      ...extraWhere, // <- Merge extra conditions here
+      ...extraWhere,
     };
 
     const orderBy = this.buildOrderByCondition(sortField, sortType);
     const offset = (Number(page) - 1) * Number(limit);
 
     const [data, count]: [T[], number] = await Promise.all([
+
       model.findMany({
         skip: offset,
         take: +limit,
         where,
-        orderBy,
-        include,
+        ...(orderBy && Object.keys(orderBy).length ? { orderBy } : {}),
+        ...(include && Object.keys(include).length ? { include } : {}),
       }),
       model.count({ where }),
     ]);
