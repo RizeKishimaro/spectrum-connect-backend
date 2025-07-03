@@ -1,55 +1,90 @@
-import { Injectable } from "@nestjs/common"
 
-type PaginateOptions<TArgs> = {
-  page?: number
-  limit?: number
-  where?: TArgs extends { where?: infer W } ? W : any
-  include?: TArgs extends { include?: infer I } ? I : any
-  orderBy?: TArgs extends { orderBy?: infer O } ? O : any
-}
+
+import { Injectable } from '@nestjs/common';
+import { BasicQuery } from 'src/utils/dto/query.dto';
+import { PrismaService } from 'src/utils/prisma/prisma.service';
 
 @Injectable()
 export class PaginationService {
-  async paginate<
-    TModel extends {
-      findMany: (args: any) => Promise<any>
-      count: (args: any) => Promise<number>
-    },
-    TArgs = Parameters<TModel["findMany"]>[0],
-  >(
-    model: TModel,
-    options: PaginateOptions<TArgs>,
+  constructor(private readonly prisma: PrismaService) { }
+
+  buildWhereCondition(
+    filterModel?: string,
+    filterKeyword?: string,
+    searchKeyword?: string,
+    searchColumns: string[] = [],
   ) {
+    let where: any = {};
+
+    if (filterModel && filterKeyword) {
+      if (filterModel === 'role' || filterModel === 'status') {
+        where[filterModel] = { equals: filterKeyword };
+      } else {
+        where[filterModel] = { contains: filterKeyword };
+      }
+    }
+
+    if (searchKeyword && searchColumns.length > 0) {
+      where.OR = searchColumns.map((column) => ({
+        [column]: { contains: searchKeyword },
+      }));
+    }
+
+    return where;
+  }
+
+  buildOrderByCondition(sortField?: string, sortType?: string) {
+    return sortField && sortType ? { [sortField]: sortType } : {};
+  }
+
+  async paginate<T>(
+    basicQuery: BasicQuery,
+    model: any,
+    searchColumns: string[] = [],
+    include: any = {},
+    extraWhere: any = {}, // <- Add extra where condition support
+  ): Promise<{
+    data: T[];
+    meta: { count: number; page: number; pageCount: number; limit: number };
+  }> {
     const {
       page = 1,
       limit = 10,
-      where,
-      include,
-      orderBy = { createdAt: "desc" },
-    } = options
+      sortField,
+      sortType,
+      filterModel,
+      filterKeyword,
+      searchKeyword,
+    } = basicQuery;
 
-    const skip = (page - 1) * limit
+    const where = {
+      ...this.buildWhereCondition(filterModel, filterKeyword, searchKeyword, searchColumns),
+      ...extraWhere, // <- Merge extra conditions here
+    };
 
-    const [data, total] = await Promise.all([
+    const orderBy = this.buildOrderByCondition(sortField, sortType);
+    const offset = (Number(page) - 1) * Number(limit);
+
+    const [data, count]: [T[], number] = await Promise.all([
       model.findMany({
+        skip: offset,
+        take: +limit,
         where,
-        include,
         orderBy,
-        skip,
-        take: limit,
-      } as TArgs),
-      model.count({ where } as TArgs),
-    ])
+        include,
+      }),
+      model.count({ where }),
+    ]);
 
     return {
       data,
       meta: {
-        total,
-        page,
-        totalPages: Math.ceil(total / limit),
-        limit,
+        count,
+        page: +page,
+        pageCount: Math.ceil(count / Number(limit)),
+        limit: +limit,
       },
-    }
+    };
   }
 }
 

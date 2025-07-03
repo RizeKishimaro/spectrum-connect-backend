@@ -9,24 +9,38 @@ import ffmpeg from 'fluent-ffmpeg';
 import * as fs from 'fs';
 import { PrismaService } from 'src/utils/prisma/prisma.service';
 import { ExpressRequest } from 'src/types/other';
+import { AMIProvider } from 'src/utils/providers/ami/ami-provider.service';
 
 @Injectable()
 export class SystemManagerService {
-  private ami;
-
   constructor(
     @Inject(forwardRef(() => AgentService))
     private readonly agentService: AgentService,
     private readonly parkedCallService: ParkedCallService,
-    private readonly prismaService: PrismaService
+    private readonly prismaService: PrismaService,
+    private readonly ami: AMIProvider
   ) {
-    this.ami = ManagerFactory(
-      Number(process.env.AMI_PORT),
-      process.env.AMI_HOST,
-      process.env.AMI_USERNAME,
-      process.env.AMI_PASSWORD,
-      true
-    );
+  }
+  async getDashboardData(companyId: number) {
+
+
+  }
+  async spyOnAgents(account: string, supervisoraccount: string) {
+    const formattedSip = `PJSIP/${supervisoraccount}`;
+    const response = await this.ami.action({
+      Action: 'Originate',
+      Channel: formattedSip,
+      Context: 'spy-agent',
+      Exten: 'spy',
+      Priority: 1,
+      CallerID: 'Supervisor',
+      Variable: `spyacc=${account}`,
+    });
+
+    return {
+      statusCode: HttpStatus.OK,
+      message: "success"
+    }
   }
 
   async getStatus(): Promise<any> {
@@ -44,7 +58,6 @@ export class SystemManagerService {
   }
 
   async checkPing() {
-    this.ami.keepConnected();
     const res = this.ami.action({
       action: "ping"
     })
@@ -79,12 +92,7 @@ export class SystemManagerService {
         action: 'PJSIPShowEndpoint',
         endpoint: extension,
         actionid: actionId,
-      }, (err) => {
-        if (err) {
-          this.ami.removeListener('rawevent', onRawEvent);
-          reject(err);
-        }
-      });
+      },);
     });
   }
 
@@ -95,13 +103,6 @@ export class SystemManagerService {
           Action: 'Command',
           Command: cmd,
         },
-        (err, res) => {
-          if (err) {
-            reject(err);
-          } else {
-            resolve(res.output || []);
-          }
-        }
       );
     });
   }

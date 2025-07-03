@@ -2,10 +2,16 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { CreateSubscriptionDto, UpdateSubscriptionDto } from './dto';
 import { PrismaService } from 'src/utils/prisma/prisma.service';
+import { PaginationService } from 'src/utils/providers/pagination/pagination.service';
+import { BasicQuery } from 'src/utils/dto/query.dto';
+import type { Subscription } from '@prisma/client';
 
 @Injectable()
 export class SubscriptionsService {
-  constructor(private prisma: PrismaService) { }
+  constructor(
+    private prisma: PrismaService,
+    private paginationService: PaginationService
+  ) { }
 
   create(dto: CreateSubscriptionDto) {
     return this.prisma.subscription.create({ data: dto });
@@ -14,30 +20,50 @@ export class SubscriptionsService {
 
 
 
-  async findAll() {
-    const subscriptions = await this.prisma.subscription.findMany({
-      include: {
-        user: {
-          include: {
-            systemCompany: {
-              include: {
-                _count: {
-                  select: {
-                    Agent: true,
-                  },
+  async findAll(basicQuery: BasicQuery) {
+    const subscriptions = await this.paginationService.paginate(basicQuery, this.prisma.subscription, [], {
+      user: {
+        include: {
+          systemCompany: {
+            include: {
+              _count: {
+                select: {
+                  Agent: true,
                 },
               },
             },
           },
         },
       },
+
     });
+    //  await this.prisma.subscription.findMany({
+    //   include: {
+    //     user: {
+    //       include: {
+    //         systemCompany: {
+    //           include: {
+    //             _count: {
+    //               select: {
+    //                 Agent: true,
+    //               },
+    //             },
+    //           },
+    //         },
+    //       },
+    //     },
+    //   },
+    // });
 
     // 🪄 Transform each item to include maxAgents at top level!
-    return subscriptions.map((sub) => ({
+    const transformed = subscriptions.data.map((sub: any) => ({
       ...sub,
       totalAgents: sub.user.systemCompany?._count.Agent ?? 0,
     }));
+    return {
+      data: transformed,
+      meta: subscriptions.meta
+    }
   }
 
   findOne(id: string) {

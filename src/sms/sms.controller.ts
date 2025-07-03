@@ -5,6 +5,8 @@ import { SmsService } from './sms.service'
 import { SendSmsDto } from './dto/sms.dto'
 import { PaginationService } from 'src/utils/providers/pagination/pagination.service'
 import { PrismaService } from 'src/utils/prisma/prisma.service'
+import { BasicQuery } from 'src/utils/dto/query.dto'
+import { ExpressRequest } from 'src/types/other'
 
 @Controller('sms')
 export class SmsController {
@@ -32,18 +34,30 @@ export class SmsController {
     }
   }
 
+
   @Get()
-  async getAllSms(@Query() query: any) {
-    const data = await this.paginationService.paginate(this.prisma.smsLog, {
-      page: Number(query.page) || 1,
-      limit: Number(query.limit) || 10,
-      orderBy: { createdAt: 'desc' },
-    })
-    const returnData = {
+  async getAllSms(
+    @Query() query: BasicQuery,
+    @Req() req: ExpressRequest
+  ) {
+    const user = req.user.user; // assuming auth middleware attaches `user`
+
+    const where = user?.systemCompanyId
+      ? { systemCompanyId: user.systemCompanyId }
+      : {};
+
+    const data = await this.paginationService.paginate(
+      query,
+      this.prisma.smsLog,
+      ["sender", "numbers", "content"],
+      {},
+      where
+    );
+
+    return {
       ...data,
-      direction: "outbound"
+      direction: "outbound",
     };
-    return returnData
   }
 
   @Get(':id')

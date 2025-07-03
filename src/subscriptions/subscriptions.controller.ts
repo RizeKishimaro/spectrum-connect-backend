@@ -1,10 +1,12 @@
 
 import {
-  Controller, Get, Post, Body, Param, Delete, Put
+  Controller, Get, Post, Body, Param, Delete, Put,
+  Query
 } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiResponse } from '@nestjs/swagger';
 import { SubscriptionsService } from './subscriptions.service';
 import { CreateSubscriptionDto, UpdateSubscriptionDto } from './dto';
+import { BasicQuery } from 'src/utils/dto/query.dto';
 
 @ApiTags('Subscriptions 💌')
 @Controller('subscriptions')
@@ -21,8 +23,8 @@ export class SubscriptionsController {
   @Get()
   @ApiOperation({ summary: 'Get all subscriptions 🗃️' })
   @ApiResponse({ status: 200, description: 'List of subscriptions' })
-  findAll() {
-    return this.service.findAll();
+  findAll(@Query() query: BasicQuery) {
+    return this.service.findAll(query);
   }
 
   @Get(':id')

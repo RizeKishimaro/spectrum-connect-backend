@@ -4,12 +4,15 @@ import { PrismaService } from 'src/utils/prisma/prisma.service';
 import * as bcrypt from 'bcrypt';
 import { JwtService } from '@nestjs/jwt';
 import { AgentStatus } from '@prisma/client';
+import { BasicQuery } from 'src/utils/dto/query.dto';
+import { PaginationService } from 'src/utils/providers/pagination/pagination.service';
 
 @Injectable()
 export class UserService {
   constructor(
     private prisma: PrismaService,
-    private jwt: JwtService
+    private jwt: JwtService,
+    private paginationService: PaginationService,
   ) { }
 
   async login(dto: LoginDto) {
@@ -25,12 +28,15 @@ export class UserService {
     return { access_token: token, user: user };
   }
 
-  async getAllUsers() {
-    const users = await this.prisma.user.findMany({
-      include: {
-        systemCompany: true
-      }
+  async getAllUsers(basicQuery: BasicQuery) {
+    const users = await this.paginationService.paginate(basicQuery, this.prisma.user, [], {
+      systemCompany: true
     })
+    // const users = await this.prisma.user.findMany({
+    //   include: {
+    //     systemCompany: true
+    //   }
+    // })
     return users
   }
 

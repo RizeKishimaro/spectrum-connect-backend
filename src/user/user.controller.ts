@@ -1,7 +1,8 @@
-import { Body, Controller, Delete, Get, Param, Patch, Post } from '@nestjs/common';
+import { Body, Controller, Delete, Get, Param, Patch, Post, Query } from '@nestjs/common';
 import { UserService } from './user.service';
 import { LoginDto } from 'src/auth/dto/login.dto';
 import { PublicRoute } from 'src/utils/decorators/public.decorator';
+import { BasicQuery } from 'src/utils/dto/query.dto';
 
 @Controller('user')
 export class UserController {
@@ -13,8 +14,8 @@ export class UserController {
     return this.userService.login(body);
   }
   @Get()
-  getAllUsers() {
-    return this.userService.getAllUsers()
+  getAllUsers(@Query() basicQuery: BasicQuery) {
+    return this.userService.getAllUsers(basicQuery)
   }
 
   @Get(":id")

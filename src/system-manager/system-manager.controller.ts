@@ -45,6 +45,10 @@ export class SystemManagerController {
   async getIVRTrees(@Req() req: ExpressRequest) {
     return this.systemManagerService.getIVRTree(req.user.user.systemCompanyId)
   }
+  @Get("getDashboardData")
+  async getDashboardData(@Req() req: ExpressRequest) {
+    this.systemManagerService.getDashboardData(req.user.user.systemCompanyId)
+  }
 
   @Get('ivr-tree/:id')
   async getIVRTree(@Param("id") id: string, @Req() req: ExpressRequest) {
