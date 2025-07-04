@@ -49,7 +49,6 @@ export class TeliqonProcessor extends WorkerHost {
       sender,
       smsLogId,
       accessToken,
-      API_ROUTE,
     } = job.data;
     const futureTime = dayjs().add(10, 'seconds');
     const beginDate = futureTime.format('YYYY-MM-DD');

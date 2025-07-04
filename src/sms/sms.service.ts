@@ -133,7 +133,7 @@ export class SmsService {
         ...data,
         numbers: [phone],
         message: processedMessage,
-        API_KEY: process.env.TELEQON_SMS_API_KEY,
+        accessToken: process.env.TELEQON_SMS_API_KEY,
         API_ROUTE: process.env.TELIQON_SMS_API_URL,
         smsLogId: logId,
       });
