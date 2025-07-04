@@ -48,7 +48,6 @@ export class TeliqonProcessor extends WorkerHost {
       numbers,
       sender,
       smsLogId,
-      accessToken,
     } = job.data;
     const futureTime = dayjs().add(10, 'seconds');
     const beginDate = futureTime.format('YYYY-MM-DD');
@@ -69,7 +68,7 @@ export class TeliqonProcessor extends WorkerHost {
     try {
       const res = await axios.post(process.env.TELIQON_SMS_API_URL as string, payload, {
         headers: {
-          "X-Access-Token": accessToken,
+          "X-Access-Token": process.env.TELIQON_SMS_API_KEY as string,
           'Content-Type': 'application/json',
         },
       });
