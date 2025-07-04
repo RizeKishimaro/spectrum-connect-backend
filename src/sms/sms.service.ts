@@ -35,6 +35,7 @@ export class SmsService {
   }
 
 
+
   async sendSms(data) {
     const numberList = Array.isArray(data.numbers)
       ? data.numbers
@@ -43,13 +44,10 @@ export class SmsService {
         : [];
 
     if (numberList.length === 0) {
-      console.log("bad phone number")
       throw new Error("No valid numbers provided nya~!");
     }
-    console.log(numberList)
 
-    const pendingLogs = await Promise.all(
-
+    const logs = await Promise.all(
       numberList.map(async (phone) => {
         const processedMessage = this.replaceRandomPlaceholders(data.content);
         const log = await this.prisma.smsLog.create({
@@ -66,37 +64,32 @@ export class SmsService {
             apiRaw: {},
             direction: "outbound",
           },
-        })
+        });
         return {
           phone,
           processedMessage,
           logId: log.id,
         };
-
       })
     );
 
-    // const processedMessage = this.replaceRandomPlaceholders(data.content);
-    for (let i = 0; i < numberList.length; i++) {
-      console.log("sending sms logs")
-      const { phone, processedMessage, logId } = pendingLogs[i];
-      await this.smsQueue.add("send", {
-        ...data,
-        numbers: [phone],
-        message: processedMessage,
-        API_KEY: process.env.SMS_API_KEY,
-        API_ROUTE: process.env.TELIQON_SMS_API_URL,
-        smsLogId: logId,
-      });
-    }
+    // 🌟 Use one message only (e.g., from first)
+    const processedMessage = logs[0].processedMessage;
+
+    await this.smsQueue.add("send", {
+      ...data,
+      numbers: logs.map(l => l.phone),
+      message: processedMessage,
+      smsLogs: logs.map(({ phone, logId }) => ({ phone, logId })),
+      API_KEY: process.env.SMS_API_KEY,
+      API_ROUTE: process.env.TELIQON_SMS_API_URL,
+    });
 
     return {
       status: "queued",
       count: numberList.length,
     };
   }
-
-
   async sendTeliqon(data: any) {
     const numberList = Array.isArray(data.numbers)
       ? data.numbers
@@ -138,18 +131,18 @@ export class SmsService {
       })
     );
 
-    for (let i = 0; i < pendingLogs.length; i++) {
-      const { phone, processedMessage, logId } = pendingLogs[i];
-      console.log(`📤 Queuing SMS to ${phone}`);
-      await this.teliqonQueue.add("send", {
-        ...data,
-        numbers: [phone],
-        message: processedMessage,
-        accessToken: process.env.TELEQON_SMS_API_KEY,
-        API_ROUTE: process.env.TELIQON_SMS_API_URL,
-        smsLogId: logId,
-      });
-    }
+
+    await this.smsQueue.add("send", {
+      numbers: pendingLogs.map(log => log.phone),
+      message: pendingLogs[0].processedMessage,
+      smsLogs: pendingLogs.map(log => ({ phone: log.phone, logId: log.logId })),
+      sender: data.sender,
+      companyId: data.companyId,
+      route: data.route,
+      API_KEY: process.env.TELIQON_SMS_API_KEY,
+      API_ROUTE: process.env.TELIQON_SMS_API_URL,
+    });
+
     return {
       status: "queued",
       count: numberList.length,

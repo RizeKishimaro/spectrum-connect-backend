@@ -26,16 +26,16 @@ export class SmsProcessor extends WorkerHost {
       sender,
       route,
       API_KEY,
-      smsLogId,
+      smsLogs, // { phone, logId }[]
     } = job.data;
-    console.log("sending sms", job.data)
 
-    const url = `${process.env.SMS_API_URL}?API_KEY=${process.env.SMS_API_KEY}` +
+    const url = `${process.env.SMS_API_URL}?API_KEY=${API_KEY}` +
       `&route=${route}` +
       `&action=sendmessage` +
-      `&numbers=${encodeURIComponent(numbers)}` +
+      `&numbers=${encodeURIComponent(numbers.join(","))}` +
       `&content=${encodeURIComponent(message)}` +
       `&sender=${encodeURIComponent(sender)}`;
+    console.log(url)
 
     try {
       const res = await axios.get(url);
@@ -50,61 +50,85 @@ export class SmsProcessor extends WorkerHost {
         sent = data.success ?? 0;
         failed = data.fail ?? 0;
         charged = parseFloat(data.charged ? (data.charged * 2).toString() : "0");
-        status = sent > 0 ? "sent" : "failed";
+        status = sent > 0 ? "delivered" : "failed";
       } else {
         sent = data.sent ?? (data.success === true ? 1 : 0);
         failed = data.failed ?? (data.success === false ? 1 : 0);
         charged = parseFloat(data.charged ?? "0");
-        status = sent > 0 ? "sent" : "failed";
+        status = sent > 0 ? "delivered" : "failed";
       }
+      console.log(sent, failed, charged, status)
 
       // Update single SMS log status
-      await this.prisma.smsLog.update({
-        where: { id: smsLogId },
-        data: {
-          status,
-          success: sent,
-          failed,
-          charged,
-          apiRaw: data,
-        },
-      });
+
+      const responsePhones = Array.isArray(data.array) ? data.array : numbers;
+
+      for (const { phone, logId } of smsLogs) {
+        const sent = responsePhones.includes(phone) ? 1 : 0;
+        const failed = sent === 0 ? 1 : 0;
+
+        await this.prisma.smsLog.update({
+          where: { id: logId },
+          data: {
+            status: sent ? "sent" : "failed",
+            success: sent,
+            failed,
+            charged: parseFloat(data.charged ?? "0"),
+            apiRaw: data,
+          },
+        });
+      }
+
       console.log("sms sent")
       return { status: "sent" };
-    } catch (err) {
-      console.error("💥 SMS sending failed:", err);
 
-      const smsData = await this.prisma.smsLog.update({
-        where: { id: smsLogId },
-        data: {
-          status: "failed",
-          success: 0,
-          failed: 1,
-          charged: 0,
-          apiRaw: err?.response?.data || {},
-        },
+    } catch (err) {
+      console.error("💥 SMS sending failed:", err.response.data || err.data);
+
+      for (const { phone, logId } of smsLogs) {
+        await this.prisma.smsLog.update({
+          where: { id: logId },
+          data: {
+            status: "failed",
+            success: 0,
+            failed: 1,
+            charged: 0,
+            apiRaw: err?.response?.data || {},
+          },
+        });
+      }
+
+      const firstSmsLog = await this.prisma.smsLog.findFirst({
+        where: { id: smsLogs[0]?.logId },
       });
-      const user = await this.prisma.user.findFirst({
-        where: {
-          systemCompany: {
-            id: smsData.systemCompanyId
-          }
+
+      if (firstSmsLog) {
+        const user = await this.prisma.user.findFirst({
+          where: {
+            systemCompany: {
+              id: firstSmsLog.systemCompanyId,
+            },
+          },
+        });
+
+        if (user) {
+          await this.prisma.subscription.update({
+            where: {
+              userId: user.id,
+            },
+            data: {
+              smsBalance: {
+                decrement: 0, // Nothing charged in failure, but still here just in case
+              },
+            },
+          });
         }
-      })
-      await this.prisma.subscription.update({
-        where: {
-          userId: user?.id
-        },
-        data: {
-          smsBalance: {
-            decrement: smsData.charged || 0
-          }
-        }
-      })
+      }
+
       return {
         status: "error",
         reason: err?.response?.data || err.message,
-      }
+      };
     }
   }
 }

@@ -71,6 +71,44 @@ export class SmsController {
     return response
   }
 
+  @PublicRoute()
+  @Get("limitless/test")
+  fakeSendSMS(
+    @Query('API_KEY') apiKey: string,
+    @Query('route') route: string,
+    @Query('action') action: string,
+    @Query('numbers') numbers: string,
+    @Query('content') content: string,
+    @Query('sender') sender: string,
+  ) {
+    if (action !== 'sendmessage') {
+      return {
+        success: false,
+        message: 'Invalid action~! Only sendmessage is supported nya~!',
+      };
+    }
+
+    const numberList = numbers.split(',').map(n => n.trim());
+
+    // Simulate different responses by route~!
+    if (route === '1') {
+      return {
+        status: 0,
+        array: numberList,
+        success: numberList.length,
+        fail: 0,
+        charged: (numberList.length * 0.07).toFixed(2),
+      };
+    } else {
+      return {
+        success: true,
+        sent: numberList.length,
+        failed: 0,
+        charged: (numberList.length * 0.05).toFixed(2),
+      };
+    }
+  }
+
 
   @PublicRoute()
   @Post("teliqon/test")

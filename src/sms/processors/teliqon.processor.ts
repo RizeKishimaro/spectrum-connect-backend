@@ -52,11 +52,12 @@ export class TeliqonProcessor extends WorkerHost {
 
     const payload = [
       {
-        number: [numbers],
+        number: numbers,
         senderID: sender,
         text: message,
       }
     ];
+    console.log(payload)
 
     try {
 
