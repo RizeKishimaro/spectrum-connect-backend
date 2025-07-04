@@ -70,7 +70,7 @@ export class TeliqonProcessor extends WorkerHost {
     try {
       const res = await axios.post(process.env.TELIQON_SMS_API_URL as string, payload, {
         headers: {
-          Authorization: `Bearer ${accessToken}`,
+          "X-Access-Token": accessToken,
           'Content-Type': 'application/json',
         },
       });
