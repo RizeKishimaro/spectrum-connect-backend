@@ -26,12 +26,11 @@ export class SmsProcessor extends WorkerHost {
       sender,
       route,
       API_KEY,
-      API_ROUTE,
       smsLogId, // the log to update
     } = job.data;
     console.log("sending sms", job)
 
-    const url = `${API_ROUTE}?API_KEY=${API_KEY}` +
+    const url = `${process.env.SMS_API_URL}?API_KEY=${process.env.SMS_API_KEY}` +
       `&route=${route}` +
       `&action=sendmessage` +
       `&numbers=${encodeURIComponent(numbers)}` +
