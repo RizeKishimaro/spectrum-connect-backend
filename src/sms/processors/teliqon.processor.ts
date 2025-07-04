@@ -50,20 +50,21 @@ export class TeliqonProcessor extends WorkerHost {
       smsLogId,
     } = job.data;
 
-    const payload = {
-      number: [numbers],
-      senderID: sender,
-      text: message,
-    };
-
+    const payload = [
+      {
+        number: [numbers],
+        senderID: sender,
+        text: message,
+      }
+    ];
 
     try {
-      const res = await axios.get(process.env.TELIQON_SMS_API_URL!, {
+
+      const res = await axios.post(process.env.TELIQON_SMS_API_URL!, payload, {
         headers: {
           "X-Access-Token": process.env.TELIQON_SMS_API_KEY!,
           "Content-Type": "application/json"
-        },
-        params: payload,
+        }
       });
 
       const data = res.data;
