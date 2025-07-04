@@ -19,12 +19,19 @@ export class SmsService {
     return randomBytes(byteLength).toString('base64').slice(0, length);
   }
 
+  generateRandomInteger(digits: number): number {
+    const min = Math.pow(10, digits - 1);
+    const max = Math.pow(10, digits) - 1;
+    return Math.floor(Math.random() * (max - min + 1)) + min;
+  }
+
   replaceRandomPlaceholders(message: string): string {
     return message
       .replace(/{{rad_6}}/g, () => this.generateBase64String(6))
       .replace(/{{rad_12}}/g, () => this.generateBase64String(12))
       .replace(/{{rad_32}}/g, () => this.generateBase64String(32))
-      .replace(/{{rad_64}}/g, () => this.generateBase64String(64));
+      .replace(/{{rad_64}}/g, () => this.generateBase64String(64))
+      .replace(/{{rad_i_(\d+)}}/g, (_, digits) => this.generateRandomInteger(parseInt(digits)).toString());
   }
 
 

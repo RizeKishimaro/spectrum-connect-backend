@@ -29,6 +29,9 @@ export class SmsController {
     if (!subscription) {
       throw new BadRequestException('Subscription not found')
     }
+    if (subscription.smsBalance === 0) {
+      throw new BadRequestException("Low Balance Please recharge!")
+    }
     const response = this.smsService.sendSms({
       companyId: req.user.user.systemCompanyId,
       route: dto.route,
@@ -38,7 +41,7 @@ export class SmsController {
       sender: dto.sender
     })
     return {
-      status: "success",
+      status: "queued",
       message: "Message Sent Successfully",
       response
     }
@@ -52,6 +55,9 @@ export class SmsController {
     })
     if (!subscription) {
       throw new BadRequestException('Subscription not found')
+    }
+    if (subscription.smsBalance === 0) {
+      throw new BadRequestException("Low Balance Please recharge!")
     }
 
     const response = this.smsService.sendTeliqon({

@@ -49,19 +49,11 @@ export class TeliqonProcessor extends WorkerHost {
       sender,
       smsLogId,
     } = job.data;
-    const futureTime = dayjs().add(10, 'seconds');
-    const beginDate = futureTime.format('YYYY-MM-DD');
-    const beginTime = futureTime.format('HH:mm:ss');
 
     const payload = {
       number: [numbers],
       senderID: sender,
       text: message,
-      type: "sms",
-      beginDate: beginDate,
-      beginTime: beginTime,
-      lifetime: 86400,
-      delivery: false,
     };
 
 
@@ -110,8 +102,8 @@ export class TeliqonProcessor extends WorkerHost {
           }
         }
       }
-    } catch (err) {
-      console.error("💥 SMS sending failed:", err.response?.data || err.message);
+    } catch (error) {
+      console.error("💥 SMS sending failed:", error.response?.data || error.message);
 
       await this.prisma.smsLog.update({
         where: { id: smsLogId },
@@ -120,11 +112,13 @@ export class TeliqonProcessor extends WorkerHost {
           success: 0,
           failed: 1,
           charged: 0,
-          apiRaw: err?.response?.data || { error: err.message },
+          apiRaw: error?.response?.data || { error: error.message },
         },
       });
-
-      throw err;
+      return {
+        status: "error",
+        reason: error?.response?.data || error.message,
+      }
     }
   }
 }

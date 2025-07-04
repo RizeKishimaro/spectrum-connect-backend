@@ -103,9 +103,10 @@ export class SmsProcessor extends WorkerHost {
           }
         }
       })
-
-
-      throw err;
+      return {
+        status: "error",
+        reason: err?.response?.data || err.message,
+      }
     }
   }
 }
