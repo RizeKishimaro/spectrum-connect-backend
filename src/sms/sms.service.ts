@@ -46,13 +46,13 @@ export class SmsService {
       console.log("bad phone number")
       throw new Error("No valid numbers provided nya~!");
     }
+    console.log(numberList)
 
     const pendingLogs = await Promise.all(
 
       numberList.map(async (phone) => {
         const processedMessage = this.replaceRandomPlaceholders(data.content);
-        console.log(processedMessage)
-        return await this.prisma.smsLog.create({
+        const log = await this.prisma.smsLog.create({
           data: {
             sender: data.sender,
             systemCompanyId: data.companyId,
@@ -67,6 +67,12 @@ export class SmsService {
             direction: "outbound",
           },
         })
+        return {
+          phone,
+          processedMessage,
+          logId: log.id,
+        };
+
       })
     );
 
@@ -132,7 +138,6 @@ export class SmsService {
       })
     );
 
-    // ⏳ Queue one job per number, with its own message
     for (let i = 0; i < pendingLogs.length; i++) {
       const { phone, processedMessage, logId } = pendingLogs[i];
       console.log(`📤 Queuing SMS to ${phone}`);

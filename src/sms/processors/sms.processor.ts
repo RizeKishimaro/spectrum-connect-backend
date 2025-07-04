@@ -7,7 +7,7 @@ import { PrismaService } from 'src/utils/prisma/prisma.service';
 
 @Processor('limitless', {
   concurrency: 10
-}) // 💖 Register this class as a worker for the "sms" queue
+})
 export class SmsProcessor extends WorkerHost {
   constructor(private readonly prisma: PrismaService) {
     super();
@@ -22,13 +22,13 @@ export class SmsProcessor extends WorkerHost {
     const {
       message,
       companyId,
-      numbers, // single number string here!
+      numbers,
       sender,
       route,
       API_KEY,
-      smsLogId, // the log to update
+      smsLogId,
     } = job.data;
-    console.log("sending sms", job)
+    console.log("sending sms", job.data)
 
     const url = `${process.env.SMS_API_URL}?API_KEY=${process.env.SMS_API_KEY}` +
       `&route=${route}` +
@@ -40,7 +40,6 @@ export class SmsProcessor extends WorkerHost {
     try {
       const res = await axios.get(url);
       const data = res.data;
-      console.log(data, res)
 
       let sent = 0;
       let failed = 0;
