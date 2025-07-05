@@ -48,6 +48,7 @@ export class TeliqonProcessor extends WorkerHost {
       numbers,
       sender,
       smsLogId,
+      smsLogs
     } = job.data;
 
     const payload = [
@@ -61,49 +62,32 @@ export class TeliqonProcessor extends WorkerHost {
 
     try {
 
-      const res = await axios.post(process.env.TELIQON_SMS_API_URL!, payload, {
+      const response = await axios.post(process.env.TELIQON_SMS_API_URL!, payload, {
         headers: {
           "X-Access-Token": process.env.TELIQON_SMS_API_KEY!,
           "Content-Type": "application/json"
         }
       });
 
-      const data = res.data;
-      console.log("🟢 SMS API responded:", data);
-      if (data.status === true && typeof data.data === "object") {
-        for (const [phone, stateArray] of Object.entries(data.data)) {
-          const id_state = Array.isArray(stateArray) && stateArray[0]?.id_state;
+      const results = response.data?.data || {};
 
-          if (id_state) {
-            const smsData = await this.prisma.smsLog.update({
-              where: { id: smsLogId },
-              data: {
-                status: "delivered",
-                success: data.success,
-                failed: 0,
-                charged: 0.5,
-                apiRaw: data,
-              },
-            });
-            const user = await this.prisma.user.findFirst({
-              where: {
-                systemCompany: {
-                  id: smsData.systemCompanyId
-                }
-              }
-            })
-            await this.prisma.subscription.update({
-              where: {
-                userId: user?.id
-              },
-              data: {
-                smsBalance: {
-                  decrement: smsData.charged || 0
-                }
-              }
-            })
-          }
-        }
+      for (const { phone, logId } of smsLogs) {
+        const statusEntry = results[phone]?.[0]?.id_state;
+
+        const status = statusEntry === "DELIVERED" ? "sent" : "failed";
+        const success = status === "sent" ? 1 : 0;
+        const failed = status === "failed" ? 1 : 0;
+
+        await this.prisma.smsLog.update({
+          where: { id: logId },
+          data: {
+            status,
+            success,
+            failed,
+            charged: 1, // Or your logic here
+            apiRaw: results[phone],
+          },
+        });
       }
     } catch (error) {
       console.error("💥 SMS sending failed:", error.response?.data || error.message);
