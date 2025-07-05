@@ -132,7 +132,7 @@ export class SmsService {
     );
 
 
-    await this.smsQueue.add("send", {
+    await this.teliqonQueue.add("send", {
       numbers: pendingLogs.map(log => log.phone),
       message: pendingLogs[0].processedMessage,
       smsLogs: pendingLogs.map(log => ({ phone: log.phone, logId: log.logId })),
