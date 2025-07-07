@@ -77,6 +77,37 @@ export class SmsProcessor extends WorkerHost {
             apiRaw: data,
           },
         });
+
+        if (status === "sent") {
+          // Find user from smsLog
+          const logData = await this.prisma.smsLog.findUnique({
+            where: { id: logId },
+            select: {
+              charged: true,
+              systemCompanyId: true,
+            },
+          });
+
+          const user = await this.prisma.user.findFirst({
+            where: {
+              systemCompany: {
+                id: logData?.systemCompanyId,
+              },
+            },
+            select: { id: true },
+          });
+
+          if (user) {
+            await this.prisma.subscription.update({
+              where: { userId: user.id },
+              data: {
+                smsBalance: {
+                  decrement: Number(logData?.charged as number * 1.13) || 0,
+                },
+              },
+            });
+          }
+        }
       }
 
       console.log("sms sent")
@@ -118,7 +149,7 @@ export class SmsProcessor extends WorkerHost {
             },
             data: {
               smsBalance: {
-                decrement: 0, // Nothing charged in failure, but still here just in case
+                decrement: 0,
               },
             },
           });

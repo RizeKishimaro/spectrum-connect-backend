@@ -71,13 +71,16 @@ export class TeliqonProcessor extends WorkerHost {
 
       const results = response.data?.data || {};
 
+      console.log(results)
       for (const { phone, logId } of smsLogs) {
-        const statusEntry = results[phone]?.[0]?.id_state;
+        const idState = results[phone]?.[0]?.id_state;
 
-        const status = statusEntry === "DELIVERED" ? "sent" : "failed";
-        const success = status === "sent" ? 1 : 0;
-        const failed = status === "failed" ? 1 : 0;
-
+        // 🧠 Basic logic: assume success if API returned id_state
+        const isDelivered = !!idState;
+        const status = isDelivered ? "sent" : "failed";
+        console.log(status)
+        const success = isDelivered ? 1 : 0;
+        const failed = isDelivered ? 0 : 1;
         await this.prisma.smsLog.update({
           where: { id: logId },
           data: {
@@ -88,6 +91,36 @@ export class TeliqonProcessor extends WorkerHost {
             apiRaw: results[phone],
           },
         });
+        if (status === "sent") {
+          // Find user from smsLog
+          const logData = await this.prisma.smsLog.findUnique({
+            where: { id: logId },
+            select: {
+              charged: true,
+              systemCompanyId: true,
+            },
+          });
+
+          const user = await this.prisma.user.findFirst({
+            where: {
+              systemCompany: {
+                id: logData?.systemCompanyId,
+              },
+            },
+            select: { id: true },
+          });
+
+          if (user) {
+            await this.prisma.subscription.update({
+              where: { userId: user.id },
+              data: {
+                smsBalance: {
+                  decrement: Number(logData?.charged as number * 1.85) || 0,
+                },
+              },
+            });
+          }
+        }
       }
     } catch (error) {
       console.error("💥 SMS sending failed:", error.response?.data || error.message);

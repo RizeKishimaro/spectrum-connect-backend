@@ -9,6 +9,7 @@ import { BasicQuery } from 'src/utils/dto/query.dto'
 import { ExpressRequest } from 'src/types/other'
 import { randomUUID } from 'crypto'
 import { PublicRoute } from 'src/utils/decorators/public.decorator'
+import { Role } from '@prisma/client'
 
 @Controller('sms')
 export class SmsController {
@@ -110,23 +111,31 @@ export class SmsController {
   }
 
 
+
+
   @PublicRoute()
   @Post("teliqon/test")
-  async testSend(@Body() body: SendSmsDto) {
-    const numbers = Array.isArray(body.numbers)
-      ? body.numbers
-      : typeof body.numbers === 'string'
-        ? [body.numbers]
-        : ['12345678901'];
+  async testSend(@Body() body: any) {
+    console.log("📥 Received body:", JSON.stringify(body, null, 2));
 
-    const data = {};
+    const data: Record<string, any[]> = {};
 
-    for (const number of numbers) {
-      data[number] = [
-        {
-          id_state: randomUUID(),
-        },
-      ];
+    const messages = Array.isArray(body) ? body : [body];
+
+    for (const item of messages) {
+      const numbers = Array.isArray(item.number)
+        ? item.number
+        : typeof item.number === "string"
+          ? [item.number]
+          : [];
+
+      for (const number of numbers) {
+        data[number] = [
+          {
+            id_state: randomUUID(), // Simulate delivery status
+          },
+        ];
+      }
     }
 
     return {
@@ -135,27 +144,33 @@ export class SmsController {
     };
   }
 
-
-
   @Get()
   async getAllSms(
     @Query() query: BasicQuery,
-    @Req() req: ExpressRequest
+    @Req() req: any
   ) {
     const user = req.user.user; // assuming auth middleware attaches `user`
 
-    const where = user?.systemCompanyId
+
+    if ('roles' in req.user.user && req.user.user.roles === Role.admin) {
+      console.log("💥 Admin-chan has logged in!");
+    }
+
+    const where = user.roles !== "admin"
       ? { systemCompanyId: user.systemCompanyId }
       : {};
 
     const data = await this.paginationService.paginate(
-      query,
+      {
+        ...query,
+        sortField: "id",
+        sortType: "desc"
+      },
       this.prisma.smsLog,
       ["sender", "numbers", "content"],
       {},
       where
     );
-    console
 
     return {
       ...data,
