@@ -21,6 +21,7 @@ import { PaginationModule } from './utils/providers/pagination/pagination.module
 import { SmsModule } from './sms/sms.module';
 import { BullModule } from '@nestjs/bullmq';
 import { CrmModule } from './crm/crm.module';
+import { AppointmentModule } from './appointment/appointment.module';
 
 @Module({
   imports: [
@@ -49,7 +50,8 @@ import { CrmModule } from './crm/crm.module';
     ParkedCallModule,
     SubscriptionsModule,
     SmsModule,
-    CrmModule
+    CrmModule,
+    AppointmentModule
   ],
   controllers: [AppController],
   providers: [

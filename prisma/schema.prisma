@@ -209,18 +209,18 @@ model ParkedCall {
 }
 
 model Crm {
-  id            String   @id @default(cuid())
+  id            String    @id @default(cuid())
   email         String
   phone         String
   companyName   String
   employeeCount String
   companyCount  String
   services      String[]
-  isContacted   Boolean  @default(false)
+  isContacted   Boolean   @default(false)
   description   String?
   address       String?
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime? @updatedAt
 
   Appointment Appointment[]
 
@@ -239,7 +239,7 @@ model Appointment {
   status       AppointmentStatus @default(pending)
   note         String? // optional: why the appointment was rescheduled or notes from call
   createdAt    DateTime          @default(now())
-  updatedAt    DateTime
+  updatedAt    DateTime?         @updatedAt
 
   @@index([status])
   @@map("appointments")
