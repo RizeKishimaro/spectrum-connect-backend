@@ -21,21 +21,18 @@ export class SmsProcessor extends WorkerHost {
 
     const {
       message,
-      companyId,
-      numbers,
+      numbers, // single number string here!
       sender,
       route,
-      API_KEY,
-      smsLogs, // { phone, logId }[]
+      smsLogId, // the log to update
     } = job.data;
 
-    const url = `${process.env.SMS_API_URL}?API_KEY=${API_KEY}` +
+    const url = `${process.env.SMS_API_URL}?API_KEY=${process.env.SMS_API_KEY}` +
       `&route=${route}` +
       `&action=sendmessage` +
-      `&numbers=${encodeURIComponent(numbers.join(","))}` +
+      `&numbers=${encodeURIComponent(numbers)}` +
       `&content=${encodeURIComponent(message)}` +
       `&sender=${encodeURIComponent(sender)}`;
-    console.log(url)
 
     try {
       const res = await axios.get(url);
@@ -50,116 +47,61 @@ export class SmsProcessor extends WorkerHost {
         sent = data.success ?? 0;
         failed = data.fail ?? 0;
         charged = parseFloat(data.charged ? (data.charged * 2).toString() : "0");
-        status = sent > 0 ? "delivered" : "failed";
+        status = sent > 0 ? "sent" : "failed";
       } else {
         sent = data.sent ?? (data.success === true ? 1 : 0);
         failed = data.failed ?? (data.success === false ? 1 : 0);
         charged = parseFloat(data.charged ?? "0");
-        status = sent > 0 ? "delivered" : "failed";
+        status = sent > 0 ? "sent" : "failed";
       }
-      console.log(sent, failed, charged, status)
 
       // Update single SMS log status
-
-      const responsePhones = Array.isArray(data.array) ? data.array : numbers;
-
-      for (const { phone, logId } of smsLogs) {
-        const sent = responsePhones.includes(phone) ? 1 : 0;
-        const failed = sent === 0 ? 1 : 0;
-
-        await this.prisma.smsLog.update({
-          where: { id: logId },
-          data: {
-            status: sent ? "sent" : "failed",
-            success: sent,
-            failed,
-            charged: parseFloat(data.charged ?? "0"),
-            apiRaw: data,
-          },
-        });
-
-        if (status === "sent") {
-          // Find user from smsLog
-          const logData = await this.prisma.smsLog.findUnique({
-            where: { id: logId },
-            select: {
-              charged: true,
-              systemCompanyId: true,
-            },
-          });
-
-          const user = await this.prisma.user.findFirst({
-            where: {
-              systemCompany: {
-                id: logData?.systemCompanyId,
-              },
-            },
-            select: { id: true },
-          });
-
-          if (user) {
-            await this.prisma.subscription.update({
-              where: { userId: user.id },
-              data: {
-                smsBalance: {
-                  decrement: Number(logData?.charged as number * 1.13) || 0,
-                },
-              },
-            });
-          }
-        }
-      }
-
+      await this.prisma.smsLog.update({
+        where: { id: smsLogId },
+        data: {
+          status,
+          success: sent,
+          failed,
+          charged,
+          apiRaw: data,
+        },
+      });
       console.log("sms sent")
       return { status: "sent" };
-
     } catch (err) {
-      console.error("💥 SMS sending failed:", err.response.data || err.data);
+      console.error("💥 SMS sending failed:", err);
 
-      for (const { phone, logId } of smsLogs) {
-        await this.prisma.smsLog.update({
-          where: { id: logId },
-          data: {
-            status: "failed",
-            success: 0,
-            failed: 1,
-            charged: 0,
-            apiRaw: err?.response?.data || {},
-          },
-        });
-      }
-
-      const firstSmsLog = await this.prisma.smsLog.findFirst({
-        where: { id: smsLogs[0]?.logId },
+      const smsData = await this.prisma.smsLog.update({
+        where: { id: smsLogId },
+        data: {
+          status: "failed",
+          success: 0,
+          failed: 1,
+          charged: 0,
+          apiRaw: err?.response?.data || {},
+        },
       });
-
-      if (firstSmsLog) {
-        const user = await this.prisma.user.findFirst({
-          where: {
-            systemCompany: {
-              id: firstSmsLog.systemCompanyId,
-            },
-          },
-        });
-
-        if (user) {
-          await this.prisma.subscription.update({
-            where: {
-              userId: user.id,
-            },
-            data: {
-              smsBalance: {
-                decrement: 0,
-              },
-            },
-          });
+      const user = await this.prisma.user.findFirst({
+        where: {
+          systemCompany: {
+            id: smsData.systemCompanyId
+          }
         }
-      }
-
+      })
+      await this.prisma.subscription.update({
+        where: {
+          userId: user?.id
+        },
+        data: {
+          smsBalance: {
+            decrement: smsData.charged || 0
+          }
+        }
+      })
       return {
         status: "error",
         reason: err?.response?.data || err.message,
-      };
+      }
     }
   }
 }

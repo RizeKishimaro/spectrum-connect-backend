@@ -15,7 +15,8 @@ async function bootstrap() {
   const allowedOrigins = process.env.ALLOWED_ORIGINS?.split(',') || [];
 
   app.enableCors({
-    origin: allowedOrigins,
+    // origin: allowedOrigins,
+    origin: '*',
     credentials: true,
   });
   app.useStaticAssets(join(process.cwd(), 'public'));
