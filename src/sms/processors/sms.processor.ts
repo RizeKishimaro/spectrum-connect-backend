@@ -34,6 +34,7 @@ export class SmsProcessor extends WorkerHost {
       `&content=${encodeURIComponent(message)}` +
       `&sender=${encodeURIComponent(sender)}`;
 
+
     try {
       const res = await axios.get(url);
       const data = res.data;
@@ -55,8 +56,7 @@ export class SmsProcessor extends WorkerHost {
         status = sent > 0 ? "sent" : "failed";
       }
 
-      // Update single SMS log status
-      await this.prisma.smsLog.update({
+      const smsData = await this.prisma.smsLog.update({
         where: { id: smsLogId },
         data: {
           status,
@@ -66,8 +66,31 @@ export class SmsProcessor extends WorkerHost {
           apiRaw: data,
         },
       });
-      console.log("sms sent")
+
+      if (status === 'sent' && charged > 0) {
+        const user = await this.prisma.user.findFirst({
+          where: {
+            systemCompany: {
+              id: smsData.systemCompanyId
+            }
+          }
+        });
+
+        if (user) {
+          await this.prisma.subscription.update({
+            where: { userId: user.id },
+            data: {
+              smsBalance: {
+                decrement: charged
+              }
+            }
+          });
+        }
+      }
+
+      console.log("📤 SMS sent successfully!");
       return { status: "sent" };
+
     } catch (err) {
       console.error("💥 SMS sending failed:", err);
 
@@ -81,27 +104,12 @@ export class SmsProcessor extends WorkerHost {
           apiRaw: err?.response?.data || {},
         },
       });
-      const user = await this.prisma.user.findFirst({
-        where: {
-          systemCompany: {
-            id: smsData.systemCompanyId
-          }
-        }
-      })
-      await this.prisma.subscription.update({
-        where: {
-          userId: user?.id
-        },
-        data: {
-          smsBalance: {
-            decrement: smsData.charged || 0
-          }
-        }
-      })
+
+      // ❌ Failed case: no deduction!
       return {
         status: "error",
         reason: err?.response?.data || err.message,
-      }
+      };
     }
   }
 }
