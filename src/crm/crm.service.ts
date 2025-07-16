@@ -6,33 +6,31 @@ import { PaginationService } from 'src/utils/providers/pagination/pagination.ser
 
 @Injectable()
 export class CrmService {
-  constructor(private prisma: PrismaService, private paginationService: PaginationService) {}
+  constructor(private prisma: PrismaService, private paginationService: PaginationService) { }
 
   create(data: CreateCrmDto) {
     return this.prisma.crm.create({ data });
   }
 
-async findAll(user: any, page = 1, limit = 10) {
-  let where = {};
+  async findAll(user: any, page = '1', limit = '10') {
+    let where = {};
 
-  // Optional: adapt based on roles
-  if (user?.roles === 'company_user') {
-    where = {
-      // adapt this field based on your actual Prisma schema
-      // assuming each CRM entry is linked to an agent/company
-      companyName: user.systemCompanyName,
-    };
+    // Optional: adapt based on roles
+    if (user?.roles === 'company_user') {
+      where = {
+        companyName: user.systemCompanyName,
+      };
+    }
+
+    const crms = await this.paginationService.paginate({
+      page,
+      limit,
+      sortField: "createdAt",
+      sortType: "desc"
+    }, this.prisma.crm);
+
+    return crms;
   }
-
-  const crms = await this.paginationService.paginate(this.prisma.crm, {
-    page,
-    limit,
-    where,
-    orderBy: { createdAt: 'desc' },
-  });
-
-  return crms;
-}
 
 
   findOne(id: string) {

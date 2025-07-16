@@ -8,15 +8,17 @@ import {
   Param,
   Patch,
   Delete,
+  Query,
 } from '@nestjs/common';
 import { AppointmentService } from './appointment.service';
 import { CreateAppointmentDto } from './dto/create-appointment.dto';
 import { ApiTags, ApiOperation } from '@nestjs/swagger';
+import { BasicQuery } from 'src/utils/dto/query.dto';
 
 @ApiTags('appointments')
 @Controller('appointments')
 export class AppointmentController {
-  constructor(private readonly appointmentService: AppointmentService) {}
+  constructor(private readonly appointmentService: AppointmentService) { }
 
   @Post()
   @ApiOperation({ summary: 'Create a new appointment' })
@@ -26,8 +28,8 @@ export class AppointmentController {
 
   @Get()
   @ApiOperation({ summary: 'Get all appointments' })
-  findAll() {
-    return this.appointmentService.findAll();
+  findAll(@Query() query: BasicQuery) {
+    return this.appointmentService.findAll(query);
   }
 
   @Get(':id')

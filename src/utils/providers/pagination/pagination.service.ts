@@ -42,7 +42,7 @@ export class PaginationService {
     model: any,
     searchColumns: string[] = [],
     include: any = {},
-    extraWhere: any = {}, // <- Add extra where condition support
+    extraWhere: any = {},
   ): Promise<{
     data: T[];
     meta: { count: number; page: number; pageCount: number; limit: number };

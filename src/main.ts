@@ -14,8 +14,8 @@ async function bootstrap() {
   const app = await NestFactory.create<NestExpressApplication>(AppModule);
   const allowedOrigins = process.env.ALLOWED_ORIGINS?.split(',') || [];
   app.enableCors({
-    // origin: allowedOrigins,
-    origin: '*',
+    origin: allowedOrigins,
+    // origin: '*',
     credentials: true,
   });
   app.useStaticAssets(join(process.cwd(), 'public'));

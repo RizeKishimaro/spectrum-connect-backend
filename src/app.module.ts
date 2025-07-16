@@ -52,16 +52,16 @@ import { WsGatewayModule } from './ws-gateway/ws-gateway.module';
     SubscriptionsModule,
     SmsModule,
     CrmModule,
-    AppointmentModule
+    AppointmentModule,
     WsGatewayModule
   ],
   controllers: [AppController],
   providers: [
     AppService,
-    {
-      provide: APP_GUARD,
-      useClass: AuthGuard
-    }
+    // {
+    //   provide: APP_GUARD,
+    //   useClass: AuthGuard
+    // }
   ],
 })
 export class AppModule { }

@@ -4,31 +4,26 @@ import { Injectable } from '@nestjs/common';
 import { CreateAppointmentDto } from './dto/create-appointment.dto';
 import { PrismaService } from 'src/utils/prisma/prisma.service';
 import { PaginationService } from 'src/utils/providers/pagination/pagination.service';
+import { BasicQuery } from 'src/utils/dto/query.dto';
 
 @Injectable()
 export class AppointmentService {
   constructor(
     private prisma: PrismaService,
     private paginationService: PaginationService,
-  ) {}
+  ) { }
 
   async create(data: CreateAppointmentDto) {
     return this.prisma.appointment.create({ data });
   }
 
-  async findAll(page = 1, limit = 10) {
-    const where = {};
-    const appointments = await this.paginationService.paginate(
+  async findAll(query: BasicQuery) {
+    return this.paginationService.paginate(
+      query,
       this.prisma.appointment,
-      {
-        page,
-        limit,
-        where,
-        include: { crm: true },
-        orderBy: { createdAt: 'desc' },
-      },
+      ['name', 'phone', 'email'], // <-- Replace with searchable fields from appointment model
+      { crm: true }, // include
     );
-    return appointments;
   }
 
   async findOne(id: string) {

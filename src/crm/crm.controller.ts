@@ -18,7 +18,7 @@ import { PublicRoute } from 'src/utils/decorators/public.decorator';
 @ApiTags('crm')
 @Controller('crm')
 export class CrmController {
-  constructor(private readonly crmService: CrmService) {}
+  constructor(private readonly crmService: CrmService) { }
 
   @PublicRoute()
   @Post()
@@ -37,10 +37,10 @@ export class CrmController {
   })
   async findAll(
     @Req() req: any,
-    @Query('page') page: number = 1,
-    @Query('limit') limit: number = 10,
+    @Query('page') page: string = '1',
+    @Query('limit') limit: string = '10',
   ) {
-    const data = await this.crmService.findAll(req.user, +page, +limit);
+    const data = await this.crmService.findAll(req.user, page, limit);
     return data;
   }
 
