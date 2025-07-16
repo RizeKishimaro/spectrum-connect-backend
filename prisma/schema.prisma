@@ -205,6 +205,50 @@ model ParkedCall {
   systemCompany   SystemCompany? @relation(fields: [systemCompanyId], references: [id])
 }
 
+model Crm {
+  id            String    @id @default(cuid())
+  email         String
+  phone         String
+  companyName   String
+  employeeCount String
+  companyCount  String
+  services      String[]
+  isContacted   Boolean   @default(false)
+  description   String?
+  address       String?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime? @updatedAt
+
+  Appointment Appointment[]
+
+  @@index([email])
+  @@index([phone])
+  @@index([address])
+  @@index([companyName])
+  @@map("crms")
+}
+
+model Appointment {
+  id           String            @id @default(cuid())
+  crm          Crm               @relation(fields: [crmId], references: [id])
+  crmId        String
+  scheduledFor DateTime
+  status       AppointmentStatus @default(pending)
+  note         String? // optional: why the appointment was rescheduled or notes from call
+  createdAt    DateTime          @default(now())
+  updatedAt    DateTime?         @updatedAt
+
+  @@index([status])
+  @@map("appointments")
+}
+
+enum AppointmentStatus {
+  pending
+  confirmed
+  cancelled
+  completed
+}
+
 enum SIPTech {
   PJSIP
   SIP

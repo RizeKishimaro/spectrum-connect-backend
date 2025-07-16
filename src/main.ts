@@ -13,7 +13,6 @@ import { PrismaService } from './utils/prisma/prisma.service';
 async function bootstrap() {
   const app = await NestFactory.create<NestExpressApplication>(AppModule);
   const allowedOrigins = process.env.ALLOWED_ORIGINS?.split(',') || [];
-
   app.enableCors({
     // origin: allowedOrigins,
     origin: '*',
@@ -24,7 +23,13 @@ async function bootstrap() {
   const agentService = app.get(AgentService);
   const parkedCallService = app.get(ParkedCallService);
   const prismaService = app.get(PrismaService);
-  createAgiServer(callService, agentService, myIVRTree, parkedCallService, prismaService);
+  createAgiServer(
+    callService,
+    agentService,
+    myIVRTree,
+    parkedCallService,
+    prismaService,
+  );
 
   const config = new DocumentBuilder()
     .setTitle('Spectrem Connect API 🪐')
@@ -35,6 +40,6 @@ async function bootstrap() {
 
   const document = SwaggerModule.createDocument(app, config);
   SwaggerModule.setup('api-docs', app, document); // visit: http://localhost:3000/api-docs
-  await app.listen(process.env.PORT ?? 3000);
+  await app.listen(process.env.PORT ?? 8000, '0.0.0.0');
 }
 bootstrap();

@@ -20,6 +20,8 @@ import { AuthGuard } from './utils/guards/jwt.guard';
 import { PaginationModule } from './utils/providers/pagination/pagination.module';
 import { SmsModule } from './sms/sms.module';
 import { BullModule } from '@nestjs/bullmq';
+import { CrmModule } from './crm/crm.module';
+import { AppointmentModule } from './appointment/appointment.module';
 import { WsGatewayModule } from './ws-gateway/ws-gateway.module';
 
 @Module({
@@ -49,6 +51,8 @@ import { WsGatewayModule } from './ws-gateway/ws-gateway.module';
     ParkedCallModule,
     SubscriptionsModule,
     SmsModule,
+    CrmModule,
+    AppointmentModule
     WsGatewayModule
   ],
   controllers: [AppController],
