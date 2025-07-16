@@ -1,10 +1,15 @@
 
 // sms.controller.ts
-import { Controller, Get, Post, Query, Param, Body, Req } from '@nestjs/common'
+import { Controller, Get, Post, Query, Param, Body, Req, BadRequestException } from '@nestjs/common'
 import { SmsService } from './sms.service'
 import { SendSmsDto } from './dto/sms.dto'
 import { PaginationService } from 'src/utils/providers/pagination/pagination.service'
 import { PrismaService } from 'src/utils/prisma/prisma.service'
+import { BasicQuery } from 'src/utils/dto/query.dto'
+import { ExpressRequest } from 'src/types/other'
+import { randomUUID } from 'crypto'
+import { PublicRoute } from 'src/utils/decorators/public.decorator'
+import { Role } from '@prisma/client'
 
 @Controller('sms')
 export class SmsController {
@@ -14,9 +19,20 @@ export class SmsController {
     private prisma: PrismaService, // adjust if using another ORM
   ) { }
 
-  @Post('send')
+  @Post('limitless/send')
   async sendSms(@Body() dto: SendSmsDto, @Req() req: any) {
-    console.log(dto, req.user)
+
+    const subscription = await this.prisma.subscription.findFirst({
+      where: {
+        userId: req.user.user.id
+      }
+    })
+    if (!subscription) {
+      throw new BadRequestException('Subscription not found')
+    }
+    if (subscription.smsBalance === 0) {
+      throw new BadRequestException("Low Balance Please recharge!")
+    }
     const response = this.smsService.sendSms({
       companyId: req.user.user.systemCompanyId,
       route: dto.route,
@@ -26,24 +42,140 @@ export class SmsController {
       sender: dto.sender
     })
     return {
-      status: "success",
+      status: "queued",
       message: "Message Sent Successfully",
       response
     }
   }
+  @Post("teliqon/send")
+  async sendTeliqonSMS(@Body() dto: SendSmsDto, @Req() req: ExpressRequest) {
+    const subscription = await this.prisma.subscription.findFirst({
+      where: {
+        userId: req.user.user.id
+      }
+    })
+    if (!subscription) {
+      throw new BadRequestException('Subscription not found')
+    }
+    if (subscription.smsBalance === 0) {
+      throw new BadRequestException("Low Balance Please recharge!")
+    }
+
+    const response = this.smsService.sendTeliqon({
+      companyId: req.user.user.systemCompanyId,
+      route: dto.route,
+      action: 'sendmessage',
+      content: dto.message,
+      numbers: dto.numbers,
+      sender: dto.sender
+    })
+    return response
+  }
+
+  @PublicRoute()
+  @Get("limitless/test")
+  fakeSendSMS(
+    @Query('API_KEY') apiKey: string,
+    @Query('route') route: string,
+    @Query('action') action: string,
+    @Query('numbers') numbers: string,
+    @Query('content') content: string,
+    @Query('sender') sender: string,
+  ) {
+    if (action !== 'sendmessage') {
+      return {
+        success: false,
+        message: 'Invalid action~! Only sendmessage is supported nya~!',
+      };
+    }
+
+    const numberList = numbers.split(',').map(n => n.trim());
+
+    // Simulate different responses by route~!
+    if (route === '1') {
+      return {
+        status: 0,
+        array: numberList,
+        success: numberList.length,
+        fail: 0,
+        charged: (numberList.length * 0.07).toFixed(2),
+      };
+    } else {
+      return {
+        success: true,
+        sent: numberList.length,
+        failed: 0,
+        charged: (numberList.length * 0.05).toFixed(2),
+      };
+    }
+  }
+
+
+
+
+  @PublicRoute()
+  @Post("teliqon/test")
+  async testSend(@Body() body: any) {
+    console.log("📥 Received body:", JSON.stringify(body, null, 2));
+
+    const data: Record<string, any[]> = {};
+
+    const messages = Array.isArray(body) ? body : [body];
+
+    for (const item of messages) {
+      const numbers = Array.isArray(item.number)
+        ? item.number
+        : typeof item.number === "string"
+          ? [item.number]
+          : [];
+
+      for (const number of numbers) {
+        data[number] = [
+          {
+            id_state: randomUUID(), // Simulate delivery status
+          },
+        ];
+      }
+    }
+
+    return {
+      status: true,
+      data,
+    };
+  }
 
   @Get()
-  async getAllSms(@Query() query: any) {
-    const data = await this.paginationService.paginate(this.prisma.smsLog, {
-      page: Number(query.page) || 1,
-      limit: Number(query.limit) || 10,
-      orderBy: { createdAt: 'desc' },
-    })
-    const returnData = {
+  async getAllSms(
+    @Query() query: BasicQuery,
+    @Req() req: any
+  ) {
+    const user = req.user.user; // assuming auth middleware attaches `user`
+
+
+    if ('roles' in req.user.user && req.user.user.roles === Role.admin) {
+      console.log("💥 Admin-chan has logged in!");
+    }
+
+    const where = user.roles !== "admin"
+      ? { systemCompanyId: user.systemCompanyId }
+      : {};
+
+    const data = await this.paginationService.paginate(
+      {
+        ...query,
+        sortField: "id",
+        sortType: "desc"
+      },
+      this.prisma.smsLog,
+      ["sender", "numbers", "content"],
+      {},
+      where
+    );
+
+    return {
       ...data,
-      direction: "outbound"
+      direction: "outbound",
     };
-    return returnData
   }
 
   @Get(':id')

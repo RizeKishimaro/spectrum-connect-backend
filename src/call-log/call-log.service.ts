@@ -4,6 +4,7 @@ import { CreateCallLogDto, UpdateCallLogDto } from './dto'
 import { PrismaService } from 'src/utils/prisma/prisma.service'
 import { AgentStatus, CallStatus } from '@prisma/client';
 import { PaginationService } from 'src/utils/providers/pagination/pagination.service';
+import { BasicQuery } from 'src/utils/dto/query.dto';
 
 @Injectable()
 export class CallLogService {
@@ -51,8 +52,8 @@ export class CallLogService {
       }
     });
   }
-  async findAll(user: any, page: number = 1, limit: number = 10) {
-    if (!user.user.roles) return await this.findAgentCallLogs(user, page, limit)
+  async findAll(user: any, query: BasicQuery) {
+    if (!user.user.roles) return await this.findAgentCallLogs(user, query)
     const where = user.user.roles === 'company_user'
       ? {
         agent: {
@@ -61,17 +62,11 @@ export class CallLogService {
       }
       : {};
 
-    const call_logs = await this.paginationService.paginate(this.prisma.callLog, {
-      page,
-      limit,
-      where,
-      include: { agent: true },
-      orderBy: { createdAt: 'desc' }, // optional~
-    });
+    const call_logs = await this.paginationService.paginate(query, this.prisma.callLog, [], {}, where);
     return call_logs;
   }
 
-  async findAgentCallLogs(user: any, page: number = 1, limit: number = 10) {
+  async findAgentCallLogs(user: any, query: BasicQuery) {
     const where =
     {
       agent: {
@@ -81,13 +76,7 @@ export class CallLogService {
     }
 
 
-    const call_logs = await this.paginationService.paginate(this.prisma.callLog, {
-      page,
-      limit,
-      where,
-      include: { agent: true },
-      orderBy: { createdAt: 'desc' }, // optional~
-    });
+    const call_logs = await this.paginationService.paginate(query, this.prisma.callLog, [], {}, where);
     return call_logs;
   }
 

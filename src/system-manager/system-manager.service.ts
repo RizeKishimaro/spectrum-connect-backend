@@ -1,31 +1,46 @@
-import { BadRequestException, forwardRef, HttpStatus, Inject, Injectable, InternalServerErrorException, NotFoundException } from '@nestjs/common';
+import { BadGatewayException, BadRequestException, forwardRef, HttpStatus, Inject, Injectable, InternalServerErrorException, NotFoundException } from '@nestjs/common';
 import { Interval } from '@nestjs/schedule';
 import ManagerFactory from 'asterisk-manager';
 import { AgentService } from 'src/agent/agent.service';
 import { ParkedCallService } from 'src/parked-call/parked-call.service';
-import { generateDialplan, IvrNode, saveIvrDialplan, writeDialplanToFile } from 'src/utils/dialplan/dialplan-manager';
+import { deleteIVRTree, generateDialplan, IvrNode, saveIvrDialplan, writeDialplanToFile } from 'src/utils/dialplan/dialplan-manager';
 import { extname, join } from 'path';
 import ffmpeg from 'fluent-ffmpeg';
 import * as fs from 'fs';
 import { PrismaService } from 'src/utils/prisma/prisma.service';
+import { ExpressRequest } from 'src/types/other';
+import { AMIProvider } from 'src/utils/providers/ami/ami-provider.service';
 
 @Injectable()
 export class SystemManagerService {
-  private ami;
-
   constructor(
     @Inject(forwardRef(() => AgentService))
     private readonly agentService: AgentService,
     private readonly parkedCallService: ParkedCallService,
-    private readonly prismaService: PrismaService
+    private readonly prismaService: PrismaService,
+    private readonly ami: AMIProvider
   ) {
-    this.ami = ManagerFactory(
-      Number(process.env.AMI_PORT),
-      process.env.AMI_HOST,
-      process.env.AMI_USERNAME,
-      process.env.AMI_PASSWORD,
-      true
-    );
+  }
+  async getDashboardData(companyId: number) {
+
+
+  }
+  async spyOnAgents(account: string, supervisoraccount: string) {
+    const formattedSip = `PJSIP/${supervisoraccount}`;
+    const response = await this.ami.action({
+      Action: 'Originate',
+      Channel: formattedSip,
+      Context: 'spy-agent',
+      Exten: 'spy',
+      Priority: 1,
+      CallerID: 'Supervisor',
+      Variable: `spyacc=${account}`,
+    });
+
+    return {
+      statusCode: HttpStatus.OK,
+      message: "success"
+    }
   }
 
   async getStatus(): Promise<any> {
@@ -43,7 +58,6 @@ export class SystemManagerService {
   }
 
   async checkPing() {
-    this.ami.keepConnected();
     const res = this.ami.action({
       action: "ping"
     })
@@ -78,12 +92,7 @@ export class SystemManagerService {
         action: 'PJSIPShowEndpoint',
         endpoint: extension,
         actionid: actionId,
-      }, (err) => {
-        if (err) {
-          this.ami.removeListener('rawevent', onRawEvent);
-          reject(err);
-        }
-      });
+      },);
     });
   }
 
@@ -94,13 +103,6 @@ export class SystemManagerService {
           Action: 'Command',
           Command: cmd,
         },
-        (err, res) => {
-          if (err) {
-            reject(err);
-          } else {
-            resolve(res.output || []);
-          }
-        }
       );
     });
   }
@@ -133,20 +135,87 @@ export class SystemManagerService {
     }
   }
 
-  saveIVRTree(body: { name: string, tree: IvrNode }) {
-    console.log(body)
-    const uniquename = body.name + "-" + Date.now()
-    // const content = generateDialplan(body.tree, uniquename);
-    // writeDialplanToFile(content, join("/etc/asterisk/", "extensions-custom.conf"));
-    saveIvrDialplan(body.tree, uniquename)
-    return {
-      status: "success",
-      statusCode: HttpStatus.OK,
-      message: "Saved IVR Tree to dialplan."
+  async saveIVRTree(
+    body: { id?: string; name: string; tree: IvrNode },
+    systemCompanyId: number
+  ) {
+    const isUpdate = !!body.id;
+    const timestampedName = `${body.name}}`;
+    const jsonTree = JSON.stringify(body.tree);
+
+    if (isUpdate) {
+      const existing = await this.prismaService.iVRTree.findUnique({
+        where: { id: body.id },
+      });
+
+      if (!existing) {
+        throw new BadRequestException("IVR not found for update, nya~!");
+      }
+
+      await deleteIVRTree(existing);
+
+      const updated = await this.prismaService.iVRTree.update({
+        where: { id: body.id },
+        data: {
+          name: existing.name,
+          tree: jsonTree,
+        },
+      });
+
+      saveIvrDialplan(body.tree, existing.name);
+
+      return {
+        status: "success",
+        message: `IVR Tree updated successfully nya~!`,
+        data: updated,
+      };
+    } else {
+      const tree = await this.prismaService.iVRTree.findUnique({
+        where: {
+          name: body.name
+        }
+      });
+      if (tree) throw new BadRequestException("Duplicated Name Please choose Another")
+      const created = await this.prismaService.iVRTree.create({
+        data: {
+          name: timestampedName,
+          tree: jsonTree,
+          systemCompanyId,
+        },
+      });
+
+      saveIvrDialplan(body.tree, timestampedName);
+
+      return {
+        status: "success",
+        message: `IVR Tree created successfully~ 💖`,
+        data: created,
+      };
     }
   }
 
-  saveIVRFiles(file: Express.Multer.File) {
+  async deleteIVRTree(id: string, systemCompanyId: number) {
+    const ivr = await this.prismaService.iVRTree.findUnique({
+      where: { id, systemCompanyId },
+    });
+    if (!ivr || (ivr.systemCompanyId !== systemCompanyId)) {
+      throw new BadRequestException("IVR not found or access denied! (｡•́︿•̀｡)");
+    }
+    deleteIVRTree(ivr)
+    await this.prismaService.iVRTree.delete({
+      where: { id, systemCompanyId },
+    });
+    this.ami.action({
+      Action: "Command",
+      Command: "pjsip reload"
+    })
+    return {
+      status: HttpStatus.OK,
+      message: "Successfully Deleted IVR Node",
+    }
+  }
+
+  saveIVRFiles(file: Express.Multer.File, systemCompanyId) {
     const outputDir = join(process.cwd(), 'public', 'sounds')
 
     const outputFilename = file.originalname
@@ -174,8 +243,9 @@ export class SystemManagerService {
               data: {
                 file_name: outputFilename,
                 file_size: stats.size,
-                file_type: 'audio/wav', // It's now WAV after conversion
+                file_type: file.mimetype,
                 file_url: publicUrl,
+                company: systemCompanyId
               },
             })
 
@@ -192,6 +262,27 @@ export class SystemManagerService {
         })
         .save(outputPath)
     })
+  }
+  async getIVRTree(systemCompanyId: number) {
+    const ivrTreeName = await this.prismaService.iVRTree.findMany({
+      where: {
+        systemCompanyId,
+      },
+      select: {
+        name: true,
+        id: true
+      }
+    })
+    return ivrTreeName
+  }
+  async findIVRNode(id: string, systemCompanyId: number) {
+    const ivrNode = await this.prismaService.iVRTree.findUnique({
+      where: {
+        id,
+        systemCompanyId,
+      }
+    })
+    return ivrNode
   }
 
   async getIvrFiles() {

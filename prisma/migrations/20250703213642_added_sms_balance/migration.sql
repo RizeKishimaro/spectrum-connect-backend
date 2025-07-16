@@ -1,0 +1,2 @@
+-- AlterTable
+ALTER TABLE "Subscription" ADD COLUMN     "smsBalance" DOUBLE PRECISION NOT NULL DEFAULT 0.00;

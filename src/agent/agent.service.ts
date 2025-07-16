@@ -25,10 +25,39 @@ export class AgentService {
 
 
 
-  async create(data: CreateAgentDto) {
+  async create(data: CreateAgentDto, userId: string) {
+
+    const totalAgents = await this.prisma.agent.count({
+      where: {
+        systemCompany: {
+          User: {
+            some: {
+              id: userId,
+            },
+          },
+        },
+      },
+    });
+    const maxAgents = await this.prisma.subscription.findFirst({
+      where: {
+        user: {
+          id: userId,
+        },
+      },
+      select: {
+        agentCount: true,
+      },
+    })
+    if (!maxAgents) {
+      throw new BadRequestException('Subscription not found');
+    }
+
+    if (totalAgents >= maxAgents.agentCount) {
+      throw new BadRequestException('Maximum number of agents reached');
+    }
+
     const password = await bcrypt.hash(data.sipPassword, 10);
 
-    // 🍡 Create base Agent
     const agent = await this.prisma.agent.create({
       data: {
         name: data.name,

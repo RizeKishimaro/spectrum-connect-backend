@@ -6,12 +6,16 @@ import { JwtService } from '@nestjs/jwt';
 import { RegisterDto } from './dto/register.dto';
 import { LoginDto } from './dto/login.dto';
 import { AgentStatus, Role } from '@prisma/client';
+import { PjsipService } from 'src/utils/pjsip/pjsip-manager';
+import { AMIProvider } from 'src/utils/providers/ami/ami-provider.service';
 
 @Injectable()
 export class AuthService {
   constructor(
     private prisma: PrismaService,
-    private jwt: JwtService
+    private jwt: JwtService,
+    private pjsipService: PjsipService,
+    private amiService: AMIProvider
   ) { }
 
   async register(dto: RegisterDto) {
@@ -28,6 +32,11 @@ export class AuthService {
         status: AgentStatus.AVAILABLE,
       },
     });
+    await this.pjsipService.createWebRTCEndpoint({ sipUser: dto.sipUser, sipPass: dto.sipPass });
+    this.amiService.action({
+      Action: "Command",
+      Command: "pjsip reload"
+    })
     return { message: 'Registered successfully', userId: user.id };
   }
 

@@ -71,4 +71,54 @@ export async function writeProviderToPJSIP(config: {
   writeFileSync(confPath, fileContent);
 }
 
+export async function replaceProviderInPJSIPFile(
+  providerId: string,
+  config: {
+    endpoint: PJSIPSectionDto;
+    auth: PJSIPSectionDto;
+    aor: PJSIPSectionDto;
+    identify: PJSIPSectionDto;
+    contact: PJSIPSectionDto;
+  }
+) {
+  const confPath = '/etc/asterisk/pjsip-provider.conf';
+
+  const oldContent = readFileSync(confPath, 'utf-8');
+  const sectionNames = [
+    config.endpoint.name,
+    config.auth.name,
+    config.aor.name,
+    config.identify.name,
+    config.contact.name,
+  ];
+
+  // Remove old blocks
+  const cleaned = sectionNames.reduce((content, sectionName) => {
+    const regex = new RegExp(`\\[${sectionName}\\][^\\[]+`, 'g');
+    return content.replace(regex, '').trim();
+  }, oldContent);
+
+  // Create new block
+  const newContent = [cleaned, generateProviderSection(config)].filter(Boolean).join('\n\n');
+  writeFileSync(confPath, newContent + '\n');
+}
+
+function generateProviderSection(config: {
+  endpoint: PJSIPSectionDto;
+  auth: PJSIPSectionDto;
+  aor: PJSIPSectionDto;
+  identify: PJSIPSectionDto;
+  contact: PJSIPSectionDto;
+}) {
+  const sections = [config.endpoint, config.auth, config.aor, config.identify, config.contact];
+  return sections
+    .map(section => {
+      const lines = [`[${section.name}]`];
+      for (const [key, value] of Object.entries(section.config)) {
+        lines.push(`${key}=${value}`);
+      }
+      return lines.join('\n');
+    })
+    .join('\n\n');
+}
 

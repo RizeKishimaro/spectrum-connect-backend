@@ -1,6 +1,8 @@
 import { Request } from 'express';
-import { Agent } from '@prisma/client';
+import { Agent, User } from '@prisma/client';
 
 export interface ExpressRequest extends Request {
-  user: Agent
+  user: {
+    user: User | Agent
+  }
 }

@@ -16,6 +16,7 @@ import { ApiTags, ApiOperation, ApiResponse, ApiBody, ApiParam } from '@nestjs/s
 import { CallLogService } from './call-log.service'
 import { CreateCallLogDto, UpdateCallLogDto } from './dto'
 import { CallLog } from '@prisma/client'
+import { BasicQuery } from 'src/utils/dto/query.dto'
 
 @ApiTags('CallLogs')
 @Controller('call-logs')
@@ -33,8 +34,8 @@ export class CallLogController {
   @Get()
   @ApiOperation({ summary: 'List all call logs~ 🗂️' })
   @ApiResponse({ status: 200, description: 'List of call logs~ 💖', type: [Object] })
-  async findAll(@Req() req: any, @Query('page') page: number = 1, @Query('limit') limit: number = 10) {
-    const data = await this.service.findAll(req.user, page, +limit)
+  async findAll(@Req() req: any, @Query() query: BasicQuery) {
+    const data = await this.service.findAll(req.user, query)
     return data
   }
 

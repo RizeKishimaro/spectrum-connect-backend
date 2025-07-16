@@ -24,18 +24,28 @@ export class AMIProvider implements OnModuleInit {
 
   }
 
-  async action(action: Record<string, any>, keepAlive?: boolean): Promise<any> {
-    console.log("sending action")
+  async action(
+    action: Record<string, any>,
+    keepAlive?: boolean
+  ): Promise<any> {
+    console.log("sending action");
     return new Promise((resolve, reject) => {
-      this.amiConnection.action(action, (err: any, res: any) => {
+      this.amiConnection.action(action, keepAlive, (err: any, res: any) => {
         if (err) {
-          console.error('AMI Action Error:', err);
-          reject(err);
-        } else {
-          resolve(res);
+          console.error("AMI Action Error:", err);
+          return reject(err);
         }
+        resolve(res);
       });
     });
+  }
+
+  async removeListener(eventName: string, callback: Function) {
+    return this.amiConnection.removeListener(eventName, callback);
+
+  }
+  async keepConnected() {
+    return this.amiConnection.keepConnected()
   }
 
   // Add event listener 🌟

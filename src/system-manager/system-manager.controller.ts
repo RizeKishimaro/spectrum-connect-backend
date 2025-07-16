@@ -1,4 +1,4 @@
-import { BadRequestException, Body, Controller, Get, Post, Query, UploadedFile, UseInterceptors } from '@nestjs/common';
+import { BadRequestException, Body, Controller, Delete, Get, Param, Post, Query, Req, UploadedFile, UseInterceptors } from '@nestjs/common';
 import { SystemManagerService } from './system-manager.service';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { diskStorage } from 'multer';
@@ -6,6 +6,8 @@ import { extname, join } from 'path';
 import { v4 as uuidv4 } from 'uuid';
 import ffmpeg from 'fluent-ffmpeg';
 import * as fs from 'fs';
+import { ExpressRequest } from 'src/types/other';
+import { PublicRoute } from 'src/utils/decorators/public.decorator';
 
 @Controller('system-manager')
 export class SystemManagerController {
@@ -17,6 +19,7 @@ export class SystemManagerController {
     const pjsipPeers = await this.systemManagerService.sendCommand('pjsip show endpoints');
     const systemVersion = await this.systemManagerService.sendCommand('core show version');
     const response = await this.systemManagerService.checkPing()
+    console.log(channels, uptime, pjsipPeers, systemVersion, response)
 
     return {
       systemVersion,
@@ -34,9 +37,22 @@ export class SystemManagerController {
   }
 
   @Post("saveIVRTree")
-  async saveIVRTree(@Body() body: any) {
-    this.systemManagerService.saveIVRTree(body)
+  async saveIVRTree(@Body() body: any, @Req() req: ExpressRequest) {
+    this.systemManagerService.saveIVRTree(body, req.user.user.systemCompanyId)
     return body
+  }
+  @Get("ivr-trees")
+  async getIVRTrees(@Req() req: ExpressRequest) {
+    return this.systemManagerService.getIVRTree(req.user.user.systemCompanyId)
+  }
+  @Get("getDashboardData")
+  async getDashboardData(@Req() req: ExpressRequest) {
+    this.systemManagerService.getDashboardData(req.user.user.systemCompanyId)
+  }
+
+  @Get('ivr-tree/:id')
+  async getIVRTree(@Param("id") id: string, @Req() req: ExpressRequest) {
+    return this.systemManagerService.findIVRNode(id, req.user.user.systemCompanyId)
   }
 
   @Post('upload-ivr')
@@ -57,13 +73,18 @@ export class SystemManagerController {
       },
     }),
   )
-  async uploadIVR(@UploadedFile() file: Express.Multer.File) {
-    return this.systemManagerService.saveIVRFiles(file)
+  async uploadIVR(@UploadedFile() file: Express.Multer.File, @Req() req: ExpressRequest) {
+    return this.systemManagerService.saveIVRFiles(file, req.user.user.systemCompanyId)
   }
 
   @Post("delete-ivr-file")
   async deleteIvrFile(@Body() dto: { id: string }) {
     return this.systemManagerService.deleteIVRFile(dto.id)
+  }
+
+  @Delete("remove-ivr-tree/:id")
+  async removeIVRTree(@Param("id") id: string, @Req() req: ExpressRequest) {
+    return this.systemManagerService.deleteIVRTree(id, req.user.user.systemCompanyId)
   }
 
 }

@@ -22,8 +22,8 @@ export class AgentController {
 
   @Post()
   @ApiResponse({ type: AgentEntity })
-  create(@Body() createAgentDto: CreateAgentDto) {
-    return this.agentService.create(createAgentDto);
+  create(@Body() createAgentDto: CreateAgentDto, @Req() req: ExpressRequest) {
+    return this.agentService.create(createAgentDto, req.user.user.id);
   }
 
   @Get()
@@ -48,7 +48,7 @@ export class AgentController {
     @Body() body: UpdatePasswordDto,
     @Req() req: ExpressRequest,
   ) {
-    return this.agentService.updatePassword(body, req.user.id)
+    return this.agentService.updatePassword(body, req.user.user.id)
   }
 
   @Patch(':id')
