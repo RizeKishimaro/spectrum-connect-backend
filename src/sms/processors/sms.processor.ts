@@ -67,13 +67,14 @@ export class SmsProcessor extends WorkerHost {
         },
       });
 
-      if (status === 'sent' && charged > 0) {
+
+      if (status === 'sent' && job.data.billingDeduct > 0) {
         const user = await this.prisma.user.findFirst({
           where: {
             systemCompany: {
-              id: smsData.systemCompanyId
-            }
-          }
+              id: smsData.systemCompanyId,
+            },
+          },
         });
 
         if (user) {
@@ -81,9 +82,9 @@ export class SmsProcessor extends WorkerHost {
             where: { userId: user.id },
             data: {
               smsBalance: {
-                decrement: charged
-              }
-            }
+                decrement: job.data.billingDeduct,
+              },
+            },
           });
         }
       }

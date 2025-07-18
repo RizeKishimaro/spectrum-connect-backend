@@ -5,6 +5,7 @@ import { Queue } from 'bullmq'
 import { SendSmsDto } from './dto/sms.dto'
 import { randomBytes } from 'crypto';
 import { PrismaService } from 'src/utils/prisma/prisma.service';
+import axios from 'axios';
 
 @Injectable()
 export class SmsService {
@@ -71,18 +72,38 @@ export class SmsService {
     );
     console.log(pendingLogs)
 
-    // const processedMessage = this.replaceRandomPlaceholders(data.content);
+
+    const pricingList = await axios.get(
+      `${process.env.SMS_API_URL}?API_KEY=${process.env.SMS_API_KEY}&action=checkprice`
+    ).then(res => res.data.prices);
+
+    // Add markup here (1.2x for example)
+    const markupMultiplier = 1.2;
+
     for (let i = 0; i < numberList.length; i++) {
-      console.log("sending sms logs")
       const { numbers, content, id } = pendingLogs[i];
-      console.table(pendingLogs[i])
+      const phone = numbers;
+
+      const countryCode = phone.replace('+', '').slice(0, 3); // You might want a better country code extractor
+      const route = data.route;
+
+      const priceEntry = pricingList.find(
+        p => p.route === route && phone.startsWith(p.country_number)
+      );
+
+      let rawPrice = priceEntry?.price ?? 0;
+      let finalPrice = parseFloat((rawPrice * markupMultiplier).toFixed(4));
+
       await this.smsQueue.add("send", {
         ...data,
-        numbers: [numbers],
+        numbers: [phone],
         message: content,
         API_KEY: process.env.SMS_API_KEY,
         API_ROUTE: process.env.TELIQON_SMS_API_URL,
         smsLogId: id,
+        rawPrice,
+        markupMultiplier,
+        billingDeduct: finalPrice,
       });
     }
 

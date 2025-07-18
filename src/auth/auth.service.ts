@@ -42,7 +42,7 @@ export class AuthService {
 
   async login(dto: LoginDto) {
     console.log(dto)
-    const user = await this.prisma.user.findFirst({ where: { email: dto.email } });
+    const user = await this.prisma.agent.findFirst({ where: { sipUname: dto.email } });
 
     console.log(user)
     if (!user) throw new BadRequestException('Invalid credentials');
