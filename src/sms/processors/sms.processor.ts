@@ -78,6 +78,8 @@ export class SmsProcessor extends WorkerHost {
     try {
       const res = await axios.get(url);
       const data = res.data;
+      console.log(data)
+
       const { status, sent, charged, failed } = handleSmsBilling(route, data)
 
 
