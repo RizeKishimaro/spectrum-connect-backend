@@ -82,6 +82,36 @@ export class SmsController {
     @Query('content') content: string,
     @Query('sender') sender: string,
   ) {
+    if (action === 'checkprice') {
+      return {
+        status: 0,
+        prices: [
+          {
+            route: 1,
+            country: 'Argentina',
+            country_number: '54',
+            price: 0.135,
+            type: 'Shortcode',
+          },
+          {
+            route: 1,
+            country: 'Australia',
+            country_number: '61',
+            price: 0.1125,
+            type: 'Open Sender ID',
+          },
+          {
+            route: 2,
+            country: 'Myanmar',
+            country_number: '95',
+            price: 0.08,
+            type: 'Alphanumeric',
+          },
+        ],
+      };
+
+    }
+
     if (action !== 'sendmessage') {
       return {
         success: false,

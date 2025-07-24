@@ -75,7 +75,11 @@ export class SmsService {
 
     const pricingList = await axios.get(
       `${process.env.SMS_API_URL}?API_KEY=${process.env.SMS_API_KEY}&action=checkprice`
-    ).then(res => res.data.prices);
+    ).then(res => {
+      console.log(res.data)
+      return res.data.prices
+    });
+    console.log(pricingList)
 
     // Add markup here (1.2x for example)
     const markupMultiplier = 1.2;

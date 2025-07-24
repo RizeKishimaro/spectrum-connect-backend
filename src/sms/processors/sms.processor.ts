@@ -19,6 +19,46 @@ export class SmsProcessor extends WorkerHost {
       return;
     }
 
+    function handleSmsBilling(route: number, data: any) {
+      const getRouteMultiplier = (route: number): number => {
+        switch (route) {
+          case 1: return 2;
+          case 2: return 1.2;
+          case 3:
+          case 4:
+          case 5:
+          case 6:
+          case 7:
+          case 8: return 1.4286;
+          default: return 1;
+        }
+      };
+
+      const taxRate = 0.0028;
+      const sent = route === 1
+        ? data.success ?? 0
+        : data.sent ?? (data.success === true ? 1 : 0);
+
+      const failed = route === 1
+        ? data.fail ?? 0
+        : data.failed ?? (data.success === false ? 1 : 0);
+
+      const baseCharged = parseFloat(data.charged ?? "0");
+      const multiplier = getRouteMultiplier(route);
+      const chargedBeforeTax = baseCharged * multiplier;
+      const taxAmount = chargedBeforeTax * taxRate;
+      const charged = parseFloat((chargedBeforeTax + taxAmount).toFixed(4)); // roundy-round ✨
+      console.log(charged, baseCharged)
+
+      const status = sent > 0 ? "sent" : "failed";
+
+      return {
+        sent,
+        failed,
+        charged,
+        status
+      };
+    }
     const {
       message,
       numbers, // single number string here!
@@ -38,23 +78,8 @@ export class SmsProcessor extends WorkerHost {
     try {
       const res = await axios.get(url);
       const data = res.data;
+      const { status, sent, charged, failed } = handleSmsBilling(route, data)
 
-      let sent = 0;
-      let failed = 0;
-      let charged = 0;
-      let status = "failed";
-
-      if (route === 1) {
-        sent = data.success ?? 0;
-        failed = data.fail ?? 0;
-        charged = parseFloat(data.charged ? (data.charged * 2).toString() : "0");
-        status = sent > 0 ? "sent" : "failed";
-      } else {
-        sent = data.sent ?? (data.success === true ? 1 : 0);
-        failed = data.failed ?? (data.success === false ? 1 : 0);
-        charged = parseFloat(data.charged ?? "0");
-        status = sent > 0 ? "sent" : "failed";
-      }
 
       const smsData = await this.prisma.smsLog.update({
         where: { id: smsLogId },
@@ -68,7 +93,7 @@ export class SmsProcessor extends WorkerHost {
       });
 
 
-      if (status === 'sent' && job.data.billingDeduct > 0) {
+      if (status === 'sent') {
         const user = await this.prisma.user.findFirst({
           where: {
             systemCompany: {
@@ -82,7 +107,7 @@ export class SmsProcessor extends WorkerHost {
             where: { userId: user.id },
             data: {
               smsBalance: {
-                decrement: job.data.billingDeduct,
+                decrement: charged,
               },
             },
           });
@@ -111,6 +136,23 @@ export class SmsProcessor extends WorkerHost {
         status: "error",
         reason: err?.response?.data || err.message,
       };
+    }
+  }
+  private calculateChargedByRoute(route: number, baseCharged: number): number {
+    switch (route) {
+      case 1:
+        return baseCharged * 2;
+      case 2:
+        return baseCharged * 1.2;
+      case 3:
+      case 4:
+      case 5:
+      case 6:
+      case 7:
+      case 8:
+        return baseCharged * 1.4286;
+      default:
+        return baseCharged;
     }
   }
 }

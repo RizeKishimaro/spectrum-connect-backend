@@ -6,7 +6,7 @@ import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import { AgentService } from './agent/agent.service';
 import { NestExpressApplication } from '@nestjs/platform-express';
 import { join } from 'path';
-import * as myIVRTree from './ivr-config.json'; // JSON structure you gave me
+import * as myIVRTree from './ivr-config.json';
 import { ParkedCallService } from './parked-call/parked-call.service';
 import { PrismaService } from './utils/prisma/prisma.service';
 
