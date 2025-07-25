@@ -30,6 +30,9 @@ export class SmsController {
     if (!subscription) {
       throw new BadRequestException('Subscription not found')
     }
+    if (!subscription.active) {
+      throw new BadRequestException("Your Subscription has been deactivated.Please Contact Our Services")
+    }
     if (subscription.smsBalance === 0) {
       throw new BadRequestException("Low Balance Please recharge!")
     }
