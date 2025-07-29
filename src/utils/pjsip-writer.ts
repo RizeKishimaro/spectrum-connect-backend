@@ -100,6 +100,8 @@ export async function replaceProviderInPJSIPFile(
 
   // Create new block
   const newContent = [cleaned, generateProviderSection(config)].filter(Boolean).join('\n\n');
+
+  console.log(cleaned, oldContent, newContent)
   writeFileSync(confPath, newContent + '\n');
 }
 

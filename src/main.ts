@@ -18,6 +18,7 @@ async function bootstrap() {
     // origin: '*',
     credentials: true,
   });
+
   app.useStaticAssets(join(process.cwd(), 'public'));
   const callService = app.get(CallService);
   const agentService = app.get(AgentService);

@@ -63,9 +63,8 @@ export class SipProviderService {
 
 
   async update(id: string, data: UpdateSIPProviderDto) {
-    const { endpoint, auth, aor, identify, contact, ...providerData } = data;
+    const { endpoint, auth, aor, identify, contact, sipTech, ...providerData } = data;
 
-    // First, update the main SIP Provider table
     const updatedProvider = await this.prisma.sIPProvider.update({
       where: { id },
       data: {

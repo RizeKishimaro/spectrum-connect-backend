@@ -1,6 +1,4 @@
 import { BadGatewayException, BadRequestException, forwardRef, HttpStatus, Inject, Injectable, InternalServerErrorException, NotFoundException } from '@nestjs/common';
-import { Interval } from '@nestjs/schedule';
-import ManagerFactory from 'asterisk-manager';
 import { AgentService } from 'src/agent/agent.service';
 import { ParkedCallService } from 'src/parked-call/parked-call.service';
 import { deleteIVRTree, generateDialplan, IvrNode, saveIvrDialplan, writeDialplanToFile } from 'src/utils/dialplan/dialplan-manager';
@@ -8,8 +6,12 @@ import { extname, join } from 'path';
 import ffmpeg from 'fluent-ffmpeg';
 import * as fs from 'fs';
 import { PrismaService } from 'src/utils/prisma/prisma.service';
-import { ExpressRequest } from 'src/types/other';
 import { AMIProvider } from 'src/utils/providers/ami/ami-provider.service';
+import { exec as execCb } from 'child_process'
+import { promisify } from 'util';
+import si from 'systeminformation'
+
+const exec = promisify(execCb)
 
 @Injectable()
 export class SystemManagerService {
@@ -20,6 +22,40 @@ export class SystemManagerService {
     private readonly prismaService: PrismaService,
     private readonly ami: AMIProvider
   ) {
+  }
+
+  private readLastLines(filePath: string, lineCount = 20): string[] {
+    if (!fs.existsSync(filePath)) return [];
+    const file = fs.readFileSync(filePath, 'utf-8');
+    const lines = file.split('\n');
+    return lines.slice(-lineCount);
+  }
+
+  private matchMessages(lines: string[], patterns: string[]): string[] {
+    return lines.filter(line =>
+      patterns.some(pattern => line.includes(pattern))
+    );
+  }
+
+  async getErrorReport() {
+    const logs = {
+      nginx: '/var/log/nginx/access.log',
+      asterisk: '/var/log/asterisk/messages',
+      pm2: '/home/rizekishimaro/.npm/_logs/2025-06-16T03_22_10_662Z-eresolve-report.txt',
+    };
+
+    const results: Record<string, string[]> = {};
+
+    results.nginx = this.readLastLines(logs.nginx);
+    // results.nginx = this.matchMessages(nginxLines, this.nginxMessages);
+
+    results.asterisk = this.readLastLines(logs.asterisk);
+    // results.asterisk = this.matchMessages(asteriskLines, this.asteriskMessages);
+
+    results.pm2 = this.readLastLines(logs.pm2);
+    // results.pm2 = this.matchMessages(pm2Lines, this.pm2Messages);
+
+    return results;
   }
   async getDashboardData(companyId: number) {
 
@@ -44,6 +80,12 @@ export class SystemManagerService {
   }
 
   async getStatus(): Promise<any> {
+
+    function normalizeOutput(output: string | string[] | undefined): string[] {
+      if (!output) return [];
+      if (Array.isArray(output)) return output;
+      return output.split('\n'); // Split big string into lines
+    }
     const coreShowChannels = await this.sendCommand('core show channels');
     const sipShowPeers = await this.sendCommand('sip show peers');
     const pjsipShowEndpoints = await this.sendCommand('pjsip show endpoints');
@@ -96,16 +138,22 @@ export class SystemManagerService {
     });
   }
 
+
   async sendCommand(cmd: string): Promise<string[]> {
-    return new Promise((resolve, reject) => {
-      this.ami.action(
-        {
-          Action: 'Command',
-          Command: cmd,
-        },
-      );
-    });
+    try {
+      const data = await this.ami.action({
+        Action: 'Command',
+        Command: cmd,
+      });
+
+      const output = data?.Output || data?.output || "";
+      return Array.isArray(output) ? output : output.split('\n');
+    } catch (err) {
+      console.error("AMI command failed, nyaaa~ 🥹:", err);
+      return []; // or throw err if you want the error to bubble up
+    }
   }
+
 
   // @Interval(10000)
   async autoBridgeParkedCalls() {
@@ -193,6 +241,189 @@ export class SystemManagerService {
       };
     }
   }
+  async getCoreStatus() {
+    const checks = await Promise.all([
+      this.checkAsterisk(),
+      this.checkPostgres(),
+      this.checkDiskSpace(),
+      this.checkAgentPortal(),
+      this.checkNginx(),
+    ])
+
+    return checks
+  }
+
+  private async checkAsterisk() {
+    try {
+      const data = await this.sendCommand('core show uptime')
+      return {
+        name: 'Asterisk PBX',
+        status: data ? data[0].includes('System uptime') ? 'operational' : 'incident' : "incident",
+        icon: 'Phone',
+        description: 'Call processing system',
+        lastUpdated: new Date().toISOString(),
+      }
+    } catch {
+      return {
+        name: 'Asterisk PBX',
+        status: 'incident',
+        icon: 'Phone',
+        description: 'Call processing system',
+        lastUpdated: new Date().toISOString(),
+        message: 'Asterisk is unreachable!',
+      }
+    }
+  }
+
+  private async checkPostgres() {
+    try {
+      const { stdout } = await exec('pg_isready')
+      if (!stdout) {
+        return {
+          name: 'Database',
+          status: 'incident',
+          icon: 'Database',
+          description: 'PostgreSQL database',
+          lastUpdated: new Date().toISOString(),
+          message: 'Database not responding',
+        }
+
+      }
+      const status = stdout.includes('accepting connections') ? 'operational' : 'incident'
+      return {
+        name: 'Database',
+        status,
+        icon: 'Database',
+        description: 'PostgreSQL database',
+        lastUpdated: new Date().toISOString(),
+      }
+    } catch {
+      return {
+        name: 'Database',
+        status: 'incident',
+        icon: 'Database',
+        description: 'PostgreSQL database',
+        lastUpdated: new Date().toISOString(),
+        message: 'Database not responding',
+      }
+    }
+  }
+
+  private async checkDiskSpace() {
+    const { stdout } = await exec('df -h /')
+    if (!stdout) {
+      return {
+        name: 'Call Recording',
+        status: "incident",
+        icon: 'Server',
+        description: 'Disk usage for call recordings',
+        lastUpdated: new Date().toISOString(),
+        message: `Unable to check DiskStorage`,
+      }
+
+    }
+    const lines = stdout.split('\n')
+    const rootDisk = lines[1]?.split(/\s+/)
+    const used = rootDisk?.[4] || 'Unknown'
+
+    const percent = parseInt(used)
+    let status = 'operational'
+    if (percent >= 85) status = 'incident'
+    else if (percent >= 70) status = 'degraded'
+
+    return {
+      name: 'Call Recording',
+      status,
+      icon: 'Server',
+      description: 'Disk usage for call recordings',
+      lastUpdated: new Date().toISOString(),
+      message: `Disk usage at ${used}`,
+    }
+  }
+
+  private async checkAgentPortal() {
+    try {
+      const res = await fetch('http://localhost:5173', { method: 'GET' })
+      return {
+        name: 'Agent Portal',
+        status: res.ok ? 'operational' : 'incident',
+        icon: 'Users',
+        description: 'Frontend for agents',
+        lastUpdated: new Date().toISOString(),
+      }
+    } catch {
+      return {
+        name: 'Agent Portal',
+        status: 'incident',
+        icon: 'Users',
+        description: 'Frontend for agents',
+        lastUpdated: new Date().toISOString(),
+        message: 'Agent Portal unreachable',
+      }
+    }
+  }
+
+  private async checkNginx() {
+    try {
+      const { stdout } = await exec('systemctl is-active nginx')
+      return {
+        name: 'Web Server',
+        status: stdout.trim() === 'active' ? 'operational' : 'incident',
+        icon: 'Server',
+        description: 'Nginx server status',
+        lastUpdated: new Date().toISOString(),
+      }
+    } catch {
+      return {
+        name: 'Web Server',
+        status: 'incident',
+        icon: 'Server',
+        description: 'Nginx server status',
+        lastUpdated: new Date().toISOString(),
+        message: 'Nginx not running',
+      }
+    }
+  }
+  async getCpuUsage(): Promise<number> {
+    const load = await si.currentLoad()
+    return Math.round(load.currentLoad) // percentage
+  }
+
+  async getMemoryUsage(): Promise<number> {
+    const mem = await si.mem()
+    const used = (mem.active / mem.total) * 100
+    return Math.round(used)
+  }
+
+
+  async getDiskUsage(): Promise<number> {
+    const fs = await si.fsSize()
+
+    // Sum total used and total size from all partitions
+    const totalUsed = fs.reduce((acc, partition) => acc + partition.used, 0)
+    const totalSize = fs.reduce((acc, partition) => acc + partition.size, 0)
+
+    // Calculate usage percentage overall
+    const usedPercent = (totalUsed / totalSize) * 100
+
+    return Math.round(usedPercent)
+  }
+
+
+
+
+  async getNetworkUsage(): Promise<number> {
+    const stats = await si.networkStats()
+    const iface = stats[0]
+
+    const bytesPerSec = iface.rx_sec + iface.tx_sec
+
+    const bitsPerSec = bytesPerSec * 8
+
+    const mbps = bitsPerSec / 1_000_000
+
+    return Math.round(mbps * 100) / 100
+  }
 
   async deleteIVRTree(id: string, systemCompanyId: number) {
     const ivr = await this.prismaService.iVRTree.findUnique({
@@ -245,7 +476,11 @@ export class SystemManagerService {
                 file_size: stats.size,
                 file_type: file.mimetype,
                 file_url: publicUrl,
-                company: systemCompanyId
+
+                company: {
+                  connect: { id: systemCompanyId }
+                }
+
               },
             })
 

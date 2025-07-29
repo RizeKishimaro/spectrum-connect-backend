@@ -8,6 +8,7 @@ import { ExpressRequest } from "src/types/other";
 export class AuthGuard implements CanActivate {
   constructor(private jwtService: JwtService, private reflector: Reflector) { }
 
+
   async canActivate(context: ExecutionContext): Promise<boolean> {
     const isPublic = this.reflector.getAllAndOverride<boolean>(IS_PUBLIC_KEY, [
       context.getHandler(),
@@ -17,19 +18,25 @@ export class AuthGuard implements CanActivate {
       return true;
     }
 
-    const request = context.switchToHttp().getRequest();
-    const token = this.extractTokenFromHeader(request);
-    if (!token) {
-      console.log(token)
-      throw new UnauthorizedException();
+    const request = context.switchToHttp().getRequest<ExpressRequest>();
+    let token = this.extractTokenFromHeader(request);
+
+    // Fallback to query token for SSE
+    if (!token && request.query && typeof request.query.token === 'string') {
+      token = request.query.token;
     }
+
+    if (!token) {
+      throw new UnauthorizedException('No token provided');
+    }
+
     try {
       const payload = await this.jwtService.verifyAsync(token, {
         secret: process.env.JWT_SECRET,
       });
       request['user'] = payload;
     } catch {
-      throw new UnauthorizedException();
+      throw new UnauthorizedException('Invalid token');
     }
     return true;
   }

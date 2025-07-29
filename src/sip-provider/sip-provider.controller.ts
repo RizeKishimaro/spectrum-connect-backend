@@ -7,6 +7,7 @@ import {
   Param,
   Delete,
   Put,
+  Patch,
 } from '@nestjs/common';
 import { ApiTags, ApiBody, ApiResponse } from '@nestjs/swagger';
 import { SipProviderService } from './sip-provider.service';
@@ -36,7 +37,7 @@ export class SipProviderController {
     return this.service.findOne(id);
   }
 
-  @Put(':id')
+  @Patch(':id')
   @ApiBody({ type: UpdateSIPProviderDto })
   @ApiResponse({ status: 200, description: 'Updated SIP Provider' })
   update(@Param('id') id: string, @Body() dto: UpdateSIPProviderDto) {

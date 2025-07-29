@@ -29,8 +29,8 @@ export class AMIProvider implements OnModuleInit {
     keepAlive?: boolean
   ): Promise<any> {
     console.log("sending action");
-    return new Promise((resolve, reject) => {
-      this.amiConnection.action(action, keepAlive, (err: any, res: any) => {
+    const res = await new Promise((resolve, reject) => {
+      this.amiConnection.action(action, (err: any, res: any) => {
         if (err) {
           console.error("AMI Action Error:", err);
           return reject(err);
@@ -38,6 +38,7 @@ export class AMIProvider implements OnModuleInit {
         resolve(res);
       });
     });
+    return res;
   }
 
   async removeListener(eventName: string, callback: Function) {
