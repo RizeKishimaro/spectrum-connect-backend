@@ -526,6 +526,7 @@ export class SystemManagerService {
     })
     return ivrFiles
   }
+
   async deleteIVRFile(id: string) {
     try {
       const ivrFile = await this.prismaService.ivrFiles.findUnique({ where: { id } })

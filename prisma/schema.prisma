@@ -126,6 +126,8 @@ model IvrFiles {
   createdAt       DateTime      @default(now())
   updatedAt       DateTime      @updatedAt
   systemCompanyId Int
+
+  @@map("IvrFiles")
 }
 
 model SystemCompany {
