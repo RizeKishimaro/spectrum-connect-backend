@@ -18,8 +18,9 @@ type AgentStatus = {
   user?: Agent;
 };
 @WebSocketGateway({
+  namespace: "socket.io",
   cors: {
-    origin: ['http://localhost:3001', "http://localhost:5173"],  // Put your frontend URL here
+    origin: ['http://localhost:3001', "http://localhost:5173"],
     methods: ['GET', 'POST'],
     credentials: true,
   },
