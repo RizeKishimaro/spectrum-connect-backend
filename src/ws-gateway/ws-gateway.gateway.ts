@@ -17,10 +17,10 @@ type AgentStatus = {
   systemCompanyId: number;
   user?: Agent;
 };
+const allowedOrigins = process.env.ALLOWED_ORIGINS?.split(',') || [];
 @WebSocketGateway({
-  namespace: "socket.io",
   cors: {
-    origin: ['http://localhost:3001', "http://localhost:5173"],
+    origin: allowedOrigins,
     methods: ['GET', 'POST'],
     credentials: true,
   },
