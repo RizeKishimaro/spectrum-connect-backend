@@ -49,6 +49,7 @@ model SmsLog {
   success         Int
   failed          Int
   charged         Float?
+  service         String?
   apiRaw          Json
   createdAt       DateTime      @default(now())
   systemCompanyId Int

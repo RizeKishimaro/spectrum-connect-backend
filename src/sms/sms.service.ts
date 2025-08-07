@@ -12,6 +12,7 @@ export class SmsService {
   constructor(
     @InjectQueue('limitless') private smsQueue: Queue,
     @InjectQueue('teliqon') private teliqonQueue: Queue,
+    @InjectQueue("commpeak") private commpeakQueue: Queue,
     private readonly prisma: PrismaService
   ) { }
 
@@ -63,6 +64,7 @@ export class SmsService {
             status: "pending",
             success: 0,
             failed: 0,
+            service: "DIAMOND",
             charged: 0,
             apiRaw: {},
             direction: "outbound",
@@ -88,7 +90,7 @@ export class SmsService {
       const { numbers, content, id } = pendingLogs[i];
       const phone = numbers;
 
-      const countryCode = phone.replace('+', '').slice(0, 3); // You might want a better country code extractor
+      const countryCode = phone.replace('+', '').slice(0, 3);
       const route = data.route;
 
       const priceEntry = pricingList.find(
@@ -103,11 +105,77 @@ export class SmsService {
         numbers: [phone],
         message: content,
         API_KEY: process.env.SMS_API_KEY,
-        API_ROUTE: process.env.TELIQON_SMS_API_URL,
+        API_ROUTE: process.env.SMS_API_KEY,
         smsLogId: id,
         rawPrice,
         markupMultiplier,
         billingDeduct: finalPrice,
+      });
+    }
+
+    return {
+      status: "queued",
+      count: numberList.length,
+    };
+  }
+
+
+
+  async sendCommpeak(data: any) {
+    const numberList = Array.isArray(data.numbers)
+      ? data.numbers
+      : typeof data.numbers === "string"
+        ? data.numbers.split(",").map((n) => n.trim()).filter(n => n.length > 0)
+        : [];
+
+    if (numberList.length === 0) {
+      console.log("📵 Bad phone number list");
+      throw new Error("No valid numbers provided nya~!");
+    }
+
+    const markupMultiplier = 1.2;
+    const basePrice = 0.012; // 💸 Default Commpeak rate per SMS
+    const finalPrice = parseFloat((basePrice * markupMultiplier).toFixed(4));
+
+    const pendingLogs = await Promise.all(
+      numberList.map(async (phone) => {
+        const processedMessage = this.replaceRandomPlaceholders(data.content);
+        const log = await this.prisma.smsLog.create({
+          data: {
+            sender: data.sender,
+            systemCompanyId: data.companyId,
+            numbers: phone,
+            content: processedMessage,
+            status: "pending",
+            success: 0,
+            service: "GOLD",
+            failed: 0,
+            route: 0,
+            charged: 0,
+            apiRaw: {},
+            direction: "outbound",
+          },
+        });
+
+        return {
+          phone,
+          processedMessage,
+          logId: log.id,
+        };
+      })
+    );
+
+    for (let i = 0; i < pendingLogs.length; i++) {
+      const { phone, processedMessage, logId, sender } = pendingLogs[i];
+
+      console.log(`📤 Queuing Commpeak SMS to ${phone}`);
+
+      await this.commpeakQueue.add("send", {
+        numbers: [phone],
+        message: processedMessage,
+        smsLogId: logId,
+        billingDeduct: finalPrice,
+        senderId: sender
       });
     }
 
@@ -134,7 +202,7 @@ export class SmsService {
 
     const pendingLogs = await Promise.all(
       numberList.map(async (phone) => {
-        const processedMessage = this.replaceRandomPlaceholders(data.content); // 💎 Generate unique per number
+        const processedMessage = this.replaceRandomPlaceholders(data.content);
         const log = await this.prisma.smsLog.create({
           data: {
             sender: data.sender,
@@ -144,6 +212,7 @@ export class SmsService {
             route: data.route,
             status: "pending",
             success: 0,
+            service: "DIAMOND",
             failed: 0,
             charged: 0,
             apiRaw: {},

@@ -4,6 +4,7 @@ import { SmsService } from './sms.service'
 import { SmsController } from './sms.controller'
 import { SmsProcessor } from './processors/sms.processor'
 import { TeliqonProcessor } from './processors/teliqon.processor'
+import { CommpeakProcessor } from './processors/commpeak.processor'
 
 @Module({
   imports: [
@@ -12,10 +13,13 @@ import { TeliqonProcessor } from './processors/teliqon.processor'
     }),
     BullModule.registerQueue({
       name: "teliqon"
+    }),
+    BullModule.registerQueue({
+      name: "commpeak"
     })
   ],
   controllers: [SmsController],
-  providers: [SmsService, SmsProcessor, TeliqonProcessor],
+  providers: [SmsService, SmsProcessor, TeliqonProcessor, CommpeakProcessor],
 })
 export class SmsModule { }
 

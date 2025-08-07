@@ -50,6 +50,29 @@ export class SmsController {
       response
     }
   }
+  @Post('commpeak/send')
+  async sendCommpeakSMS(@Body() dto: SendSmsDto, @Req() req: any) {
+    const subscription = await this.prisma.subscription.findFirst({
+      where: {
+        userId: req.user.user.id
+      }
+    })
+    if (!subscription) {
+      throw new BadRequestException('Subscription not found')
+    }
+    if (subscription.smsBalance === 0) {
+      throw new BadRequestException("Low Balance Please recharge!")
+    }
+    const response = this.smsService.sendCommpeak({
+      companyId: req.user.user.systemCompanyId,
+      route: dto.route,
+      action: 'sendmessage',
+      content: dto.message,
+      numbers: dto.numbers,
+      sender: dto.sender
+    })
+    return response
+  }
   @Post("teliqon/send")
   async sendTeliqonSMS(@Body() dto: SendSmsDto, @Req() req: ExpressRequest) {
     const subscription = await this.prisma.subscription.findFirst({
