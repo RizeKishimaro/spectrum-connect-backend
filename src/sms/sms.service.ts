@@ -11,8 +11,8 @@ import axios from 'axios';
 export class SmsService {
   constructor(
     @InjectQueue('limitless') private smsQueue: Queue,
-    @InjectQueue('teliqon') private teliqonQueue: Queue,
     @InjectQueue("commpeak") private commpeakQueue: Queue,
+    @InjectQueue("topying") private TopyingQueue: Queue,
     private readonly prisma: PrismaService
   ) { }
 
@@ -36,6 +36,73 @@ export class SmsService {
       .replace(/{{rad_i_(\d+)}}/g, (_, digits) => this.generateRandomInteger(parseInt(digits)).toString());
   }
 
+
+
+
+  async sendTopying(data) {
+    const numberList = Array.isArray(data.numbers)
+      ? data.numbers
+      : typeof data.numbers === "string"
+        ? data.numbers.split(",").map(n => n.trim())
+        : [];
+
+    if (numberList.length === 0) {
+      console.log("bad phone number");
+      throw new Error("No valid numbers provided nya~!");
+    }
+
+    const topyingRates = [
+      { code: "240", country: "Sweden", price: 0.07 },
+      { code: "242", country: "Norway", price: 0.07 },
+      { code: "260", country: "Poland", price: 0.06 },
+      { code: "272", country: "Ireland", price: 0.07 }
+    ];
+
+    const pendingLogs = await Promise.all(
+      numberList.map(async (phone) => {
+        const processedMessage = this.replaceRandomPlaceholders(data.content);
+        return await this.prisma.smsLog.create({
+          data: {
+            sender: data.sender,
+            systemCompanyId: data.companyId,
+            numbers: phone,
+            content: processedMessage,
+            route: data.route,
+            status: "pending",
+            success: 0,
+            failed: 0,
+            service: "SILVER",
+            charged: 0,
+            apiRaw: {},
+            direction: "outbound",
+          },
+        });
+      })
+    );
+
+    const markupMultiplier = 1.3
+    const rateMatch = topyingRates.find(rate => rate.code === data.route);
+    const rawPrice = rateMatch?.price ?? 0;
+    const finalPrice = parseFloat((rawPrice * markupMultiplier).toFixed(4));
+
+    for (let i = 0; i < numberList.length; i++) {
+      const { numbers: phone, content, id, sender } = pendingLogs[i];
+
+      await this.TopyingQueue.add("send", {
+        ...data,
+        numbers: [phone],
+        message: content,
+        smsLogId: id,
+        rawPrice,
+        sender,
+        markupMultiplier,
+        billingDeduct: finalPrice,
+      });
+    } return {
+      status: "queued",
+      count: numberList.length,
+    };
+  }
 
   async sendSms(data) {
     const numberList = Array.isArray(data.numbers)
@@ -186,68 +253,4 @@ export class SmsService {
   }
 
 
-  async sendTeliqon(data: any) {
-    const numberList = Array.isArray(data.numbers)
-      ? data.numbers
-      : typeof data.numbers === "string"
-        ? data.numbers.split(",").map((n) => n.trim()).filter(n => n.length > 0)
-        : [];
-
-    if (numberList.length === 0) {
-      console.log("📵 Bad phone number list");
-      throw new Error("No valid numbers provided nya~!");
-    }
-
-
-
-    const pendingLogs = await Promise.all(
-      numberList.map(async (phone) => {
-        const processedMessage = this.replaceRandomPlaceholders(data.content);
-        const log = await this.prisma.smsLog.create({
-          data: {
-            sender: data.sender,
-            systemCompanyId: data.companyId,
-            numbers: phone,
-            content: processedMessage,
-            route: data.route,
-            status: "pending",
-            success: 0,
-            service: "DIAMOND",
-            failed: 0,
-            charged: 0,
-            apiRaw: {},
-            direction: "outbound",
-          },
-        });
-
-        return {
-          phone,
-          processedMessage,
-          logId: log.id,
-        };
-      })
-    );
-
-    // ⏳ Queue one job per number, with its own message
-    for (let i = 0; i < pendingLogs.length; i++) {
-      const { phone, processedMessage, logId } = pendingLogs[i];
-      console.log(`📤 Queuing SMS to ${phone}`);
-      await this.teliqonQueue.add("send", {
-        ...data,
-        numbers: [phone],
-        message: processedMessage,
-        accessToken: process.env.TELEQON_SMS_API_KEY,
-        API_ROUTE: process.env.TELIQON_SMS_API_URL,
-        smsLogId: logId,
-      }, {
-        delay: 10000
-      });
-    }
-    return {
-      status: "queued",
-      count: numberList.length,
-    };
-  }
-
-}
-
+} 

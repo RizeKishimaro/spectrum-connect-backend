@@ -3,8 +3,8 @@ import { BullModule } from '@nestjs/bullmq'
 import { SmsService } from './sms.service'
 import { SmsController } from './sms.controller'
 import { SmsProcessor } from './processors/sms.processor'
-import { TeliqonProcessor } from './processors/teliqon.processor'
 import { CommpeakProcessor } from './processors/commpeak.processor'
+import { TopyingProcessor } from './processors/topying.processor'
 
 @Module({
   imports: [
@@ -12,14 +12,14 @@ import { CommpeakProcessor } from './processors/commpeak.processor'
       name: 'limitless',
     }),
     BullModule.registerQueue({
-      name: "teliqon"
+      name: "commpeak"
     }),
     BullModule.registerQueue({
-      name: "commpeak"
+      name: "topying"
     })
   ],
   controllers: [SmsController],
-  providers: [SmsService, SmsProcessor, TeliqonProcessor, CommpeakProcessor],
+  providers: [SmsService, SmsProcessor, CommpeakProcessor, TopyingProcessor],
 })
 export class SmsModule { }
 

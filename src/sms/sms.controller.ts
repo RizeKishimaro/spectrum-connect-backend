@@ -50,6 +50,37 @@ export class SmsController {
       response
     }
   }
+  @Post('topying/send')
+  async sendTopyig(@Body() dto: SendSmsDto, @Req() req: any) {
+
+    const subscription = await this.prisma.subscription.findFirst({
+      where: {
+        userId: req.user.user.id
+      }
+    })
+    if (!subscription) {
+      throw new BadRequestException('Subscription not found')
+    }
+    if (!subscription.active) {
+      throw new BadRequestException("Your Subscription has been deactivated.Please Contact Our Services")
+    }
+    if (subscription.smsBalance === 0) {
+      throw new BadRequestException("Low Balance Please recharge!")
+    }
+    const response = this.smsService.sendTopying({
+      companyId: req.user.user.systemCompanyId,
+      route: dto.route,
+      action: 'sendmessage',
+      content: dto.message,
+      numbers: dto.numbers,
+      sender: dto.sender
+    })
+    return {
+      status: "queued",
+      message: "Message Sent Successfully",
+      response
+    }
+  }
   @Post('commpeak/send')
   async sendCommpeakSMS(@Body() dto: SendSmsDto, @Req() req: any) {
     const subscription = await this.prisma.subscription.findFirst({
@@ -73,30 +104,7 @@ export class SmsController {
     })
     return response
   }
-  @Post("teliqon/send")
-  async sendTeliqonSMS(@Body() dto: SendSmsDto, @Req() req: ExpressRequest) {
-    const subscription = await this.prisma.subscription.findFirst({
-      where: {
-        userId: req.user.user.id
-      }
-    })
-    if (!subscription) {
-      throw new BadRequestException('Subscription not found')
-    }
-    if (subscription.smsBalance === 0) {
-      throw new BadRequestException("Low Balance Please recharge!")
-    }
 
-    const response = this.smsService.sendTeliqon({
-      companyId: req.user.user.systemCompanyId,
-      route: dto.route,
-      action: 'sendmessage',
-      content: dto.message,
-      numbers: dto.numbers,
-      sender: dto.sender
-    })
-    return response
-  }
 
   @PublicRoute()
   @Get("limitless/test")
