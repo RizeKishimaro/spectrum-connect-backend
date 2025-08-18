@@ -21,7 +21,6 @@ export class AuthGuard implements CanActivate {
     const request = context.switchToHttp().getRequest<ExpressRequest>();
     let token = this.extractTokenFromHeader(request);
 
-    // Fallback to query token for SSE
     if (!token && request.query && typeof request.query.token === 'string') {
       token = request.query.token;
     }
