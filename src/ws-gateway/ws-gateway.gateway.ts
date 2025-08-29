@@ -58,8 +58,6 @@ export class WsGatewayGateway implements OnModuleInit {
 
   handleConnection(client: Socket) {
     console.log(`Client connected: ${client.id}`);
-    console.log(this.agents.values())
-    client.emit('agent:init', Array.from(this.agents.values()));
   }
 
 
