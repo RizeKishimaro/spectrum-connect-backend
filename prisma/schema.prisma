@@ -132,20 +132,24 @@ model IvrFiles {
 }
 
 model SystemCompany {
-  id            Int          @id @default(autoincrement())
-  name          String
-  membersCount  String
-  address       String
-  country       String
-  state         String
-  sIPProviderId String
-  Agent         Agent[]
-  IVRTree       IVRTree[]
-  ParkedCall    ParkedCall[]
-  SIPProvider   SIPProvider  @relation(fields: [sIPProviderId], references: [id])
-  User          User[]
-  SmsLog        SmsLog[]
-  IvrFiles      IvrFiles[]
+  id                   Int                    @id @default(autoincrement())
+  name                 String
+  membersCount         String
+  address              String
+  country              String
+  state                String
+  sIPProviderId        String
+  Agent                Agent[]
+  IVRTree              IVRTree[]
+  ParkedCall           ParkedCall[]
+  SIPProvider          SIPProvider            @relation(fields: [sIPProviderId], references: [id])
+  User                 User[]
+  SmsLog               SmsLog[]
+  IvrFiles             IvrFiles[]
+  CRMLeads             CRMLeads[]
+  CompanyMembers       CompanyMembers[]
+  Services             Services[]
+  CRMAppointmentStatus CRMAppointmentStatus[]
 }
 
 model SIPProvider {
@@ -243,6 +247,81 @@ model Appointment {
 
   @@index([status])
   @@map("appointments")
+}
+
+model CRMAppointmentStatus {
+  id              String           @id @default(cuid())
+  name            String
+  systemCompany   SystemCompany    @relation(fields: [systemCompanyId], references: [id])
+  systemCompanyId Int
+  isDefault       Boolean
+  createdAt       DateTime         @default(now())
+  updatedAt       DateTime?        @updatedAt
+  CRMAppointment  CRMAppointment[]
+
+  @@index([name])
+}
+
+model CRMLeads {
+  id            String     @id @default(cuid())
+  email         String
+  phone         String
+  companyName   String
+  employeeCount String?
+  companyCount  String?
+  services      Services[]
+  isContacted   Boolean    @default(false)
+  contactStatus String?
+  description   String?
+  address       String?
+  createdAt     DateTime   @default(now())
+  updatedAt     DateTime?  @updatedAt
+
+  systemCompany   SystemCompany @relation(fields: [systemCompanyId], references: [id])
+  systemCompanyId Int
+
+  Appointment CRMAppointment[]
+
+  @@index([email])
+  @@index([phone])
+  @@index([address])
+  @@index([companyName])
+}
+
+model CRMAppointment {
+  id                     String               @id @default(cuid())
+  scheduledFor           DateTime
+  companyMembers         CompanyMembers       @relation(fields: [companyMembersId], references: [id])
+  CRMLeads               CRMLeads?            @relation(fields: [cRMLeadsId], references: [id])
+  status                 CRMAppointmentStatus @relation(fields: [cRMAppointmentStatusId], references: [id])
+  note                   String?
+  cRMLeadsId             String?
+  createdAt              DateTime             @default(now())
+  updatedAt              DateTime?            @updatedAt
+  cRMAppointmentStatusId String
+  companyMembersId       String
+}
+
+model CompanyMembers {
+  id   String @id @default(cuid())
+  name String
+
+  SystemCompany    SystemCompany    @relation(fields: [systemCompanyId], references: [id])
+  systemCompanyId  Int
+  cRMAppointmentId String?
+  CRMAppointment   CRMAppointment[]
+}
+
+model Services {
+  id              String        @id @default(cuid())
+  name            String
+  systemCompany   SystemCompany @relation(fields: [systemCompanyId], references: [id])
+  systemCompanyId Int
+
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime  @updatedAt
+  CRMLeads   CRMLeads? @relation(fields: [cRMLeadsId], references: [id])
+  cRMLeadsId String?
 }
 
 enum AppointmentStatus {

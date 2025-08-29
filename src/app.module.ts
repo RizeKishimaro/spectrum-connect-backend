@@ -23,6 +23,7 @@ import { BullModule } from '@nestjs/bullmq';
 import { CrmModule } from './crm/crm.module';
 import { AppointmentModule } from './appointment/appointment.module';
 import { WsGatewayModule } from './ws-gateway/ws-gateway.module';
+import { CustomerCrmModule } from './customer-crm/customer-crm.module';
 
 @Module({
   imports: [
@@ -53,7 +54,8 @@ import { WsGatewayModule } from './ws-gateway/ws-gateway.module';
     SmsModule,
     CrmModule,
     AppointmentModule,
-    WsGatewayModule
+    WsGatewayModule,
+    CustomerCrmModule
   ],
   controllers: [AppController],
   providers: [

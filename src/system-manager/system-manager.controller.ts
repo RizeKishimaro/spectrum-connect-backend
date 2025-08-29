@@ -137,4 +137,12 @@ export class SystemManagerController {
     return this.systemManagerService.deleteIVRTree(id, req.user.user.systemCompanyId)
   }
 
+  @Get('spy')
+  async spyOnAgentCalls(
+    @Query('account') account: string,
+    @Query('spyaccount') spyaccount: string,
+  ) {
+    return this.systemManagerService.spyOnAgents(account, spyaccount);
+  }
+
 }

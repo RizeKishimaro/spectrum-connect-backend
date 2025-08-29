@@ -75,7 +75,8 @@ export class SystemManagerService {
 
     return {
       statusCode: HttpStatus.OK,
-      message: "success"
+      message: "success",
+      response
     }
   }
 
