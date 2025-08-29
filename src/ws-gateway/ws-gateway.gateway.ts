@@ -87,15 +87,15 @@ export class WsGatewayGateway implements OnModuleInit {
   @SubscribeMessage("manager:connect")
   handleManagerConnect(
     @ConnectedSocket() client: Socket,
-    @MessageBody() data: { user: User }
+    @MessageBody() data: any
   ) {
-    const room = `managers:${data.user.systemCompanyId}`;
-    client.join(room);
-    console.log(`🛡️ Manager ${data.user.name} joined room: ${room}`);
+    const managerData = JSON.parse(data.user)
+    const room = `managers:${managerData.systemCompanyId}`;
+    console.log(`🛡️ Manager ${managerData.name} joined room: ${room}`);
 
     // Emit current agents of their company only
     const agentsForCompany = Array.from(this.agents.values()).filter(
-      (agent) => agent.systemCompanyId === data.user.systemCompanyId
+      (agent) => agent.systemCompanyId === managerData.systemCompanyId
     );
     client.emit("agent:init", agentsForCompany);
   }
@@ -133,7 +133,7 @@ export class WsGatewayGateway implements OnModuleInit {
     }
 
     const updatedAgent = this.agents.get(data.agentId);
-    this.server.emit('agent:update', updatedAgent);
+    this.server.to(`managers:${data.user.systemCompanyId}`).emit('agent:update', updatedAgent);
   }
 
 }
