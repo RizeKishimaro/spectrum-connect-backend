@@ -1,8 +1,14 @@
-import { ConnectedSocket, MessageBody, SubscribeMessage, WebSocketGateway, WebSocketServer } from '@nestjs/websockets';
-import { WsGatewayService } from './ws-gateway.service';
-import { Server, Socket } from 'socket.io';
-import type { Agent, User } from '@prisma/client';
+
+import {
+  ConnectedSocket,
+  MessageBody,
+  SubscribeMessage,
+  WebSocketGateway,
+  WebSocketServer
+} from '@nestjs/websockets';
 import { OnModuleInit } from '@nestjs/common';
+import { Server, Socket } from 'socket.io';
+import type { Agent as PrismaAgent } from '@prisma/client'; // rename to avoid confusion
 
 type AgentStatus = {
   id: string;
@@ -15,9 +21,11 @@ type AgentStatus = {
   avgCallDuration?: number;
   currentCall?: any;
   systemCompanyId: number;
-  user?: Agent;
+  user?: PrismaAgent;
 };
+
 const allowedOrigins = process.env.ALLOWED_ORIGINS?.split(',') || [];
+
 @WebSocketGateway({
   cors: {
     origin: allowedOrigins,
@@ -26,96 +34,128 @@ const allowedOrigins = process.env.ALLOWED_ORIGINS?.split(',') || [];
   },
 })
 export class WsGatewayGateway implements OnModuleInit {
-  constructor(private readonly wsGatewayService: WsGatewayService) { }
-
   @WebSocketServer()
   server: Server;
 
-  private agents: Map<string, AgentStatus> = new Map();
-  private socketToAgent = new Map<string, string>()
-  private manager = new Map<string, string>
+  // in-memory state
+  private agents = new Map<string, AgentStatus>();          // agentId -> AgentStatus
+  private socketToAgent = new Map<string, string>();         // socketId -> agentId
+  private managers = new Map<string, Set<string>>();         // room -> socketIds (optional tracking)
+
+  // ---------- utils ----------
+  private getCompanyRoom = (companyId: number) => `managers:${String(companyId)}`;
+  private toPlain<T>(v: T): T {
+    // ensure serializable payloads (Dates -> ISO strings, drop prototypes)
+    return JSON.parse(JSON.stringify(v));
+  }
+
+  // ---------- lifecycle ----------
   onModuleInit() {
+    // periodic init broadcast per company
     setInterval(() => {
-      const agentsArray = Array.from(this.agents.values());
-
-      const grouped = new Map<number, AgentStatus[]>(); // systemCompanyId => agents
-
-      for (const agent of agentsArray) {
-        const list = grouped.get(agent.systemCompanyId) ?? [];
-        list.push(agent);
-        grouped.set(agent.systemCompanyId, list);
+      const grouped = new Map<number, AgentStatus[]>();
+      for (const a of this.agents.values()) {
+        const list = grouped.get(a.systemCompanyId) ?? [];
+        list.push(a);
+        grouped.set(a.systemCompanyId, list);
       }
-
       for (const [companyId, agentList] of grouped.entries()) {
-        this.server.to(`managers:${companyId}`).emit("agent:init", agentList);
+        const room = this.getCompanyRoom(companyId);
+        this.server.to(room).emit('agent:init', this.toPlain(agentList));
       }
-    }, 10000);
+    }, 10_000);
   }
 
   afterInit(server: Server) {
-    console.log('✨ AgentGateway initialized! ✨');
+    console.log('✨ WsGateway initialized!');
+    // If you run multiple instances, enable Redis adapter here.
+    // Example:
+    // import { createClient } from 'redis';
+    // import { createAdapter } from '@socket.io/redis-adapter';
+    // const pub = createClient({ url: process.env.REDIS_URL });
+    // const sub = pub.duplicate();
+    // await pub.connect(); await sub.connect();
+    // server.adapter(createAdapter(pub, sub));
   }
 
   handleConnection(client: Socket) {
     console.log(`Client connected: ${client.id}`);
   }
 
-
-
   handleDisconnect(client: Socket) {
+    // manager tracking (optional)
+    for (const set of this.managers.values()) set.delete(client.id);
+
     const agentId = this.socketToAgent.get(client.id);
-
-    if (agentId) {
-      const agent = this.agents.get(agentId);
-      if (agent) {
-        agent.status = "offline";
-        agent.lastActivity = new Date();
-        this.server.emit("agent:update", agent);
-      }
-
-      this.agents.delete(agentId);
-      this.socketToAgent.delete(client.id);
-      console.log(`💔 Agent ${agentId} disconnected and removed.`);
-    } else {
+    if (!agentId) {
       console.log(`Client ${client.id} disconnected with no agentId.`);
+      return;
     }
+
+    const agent = this.agents.get(agentId);
+    if (agent) {
+      agent.status = 'offline';
+      agent.lastActivity = new Date();
+      const room = this.getCompanyRoom(agent.systemCompanyId);
+      this.server.to(room).emit('agent:update', this.toPlain(agent));
+    }
+
+    this.agents.delete(agentId);
+    this.socketToAgent.delete(client.id);
+    console.log(`💔 Agent ${agentId} disconnected and removed.`);
   }
 
-
-  @SubscribeMessage("manager:connect")
+  // ---------- manager flow ----------
+  @SubscribeMessage('manager:connect')
   handleManagerConnect(
     @ConnectedSocket() client: Socket,
     @MessageBody() data: any
   ) {
-    const managerData = JSON.parse(data.user)
-    const room = `managers:${managerData.systemCompanyId}`;
-    console.log(`🛡️ Manager ${managerData.name} joined room: ${room}`);
+    const managerData =
+      typeof data?.user === 'string' ? JSON.parse(data.user) : data?.user;
 
-    // Emit current agents of their company only
-    const agentsForCompany = Array.from(this.agents.values()).filter(
-      (agent) => agent.systemCompanyId === managerData.systemCompanyId
-    );
-    client.emit("agent:init", agentsForCompany);
+    if (!managerData?.systemCompanyId) {
+      console.warn(`[manager:connect] missing systemCompanyId from ${client.id}`);
+      client.emit('error', { message: 'Missing systemCompanyId' });
+      return;
+    }
+
+    const room = this.getCompanyRoom(managerData.systemCompanyId);
+    client.join(room);
+
+    // optional local tracking
+    const set = this.managers.get(room) ?? new Set<string>();
+    set.add(client.id);
+    this.managers.set(room, set);
+
+    console.log(`🛡️ Manager ${managerData?.name ?? client.id} joined room: ${room}`);
+
+    // agents for this company
+    const agentsForCompany = Array.from(this.agents.values())
+      .filter(a => a.systemCompanyId === managerData.systemCompanyId);
+
+    // send current snapshot (direct to the caller)
+    client.emit('agent:init', this.toPlain(agentsForCompany));
   }
 
-
-
-
+  // ---------- agent flow ----------
   @SubscribeMessage('agent:status')
   handleAgentStatus(
     @ConnectedSocket() client: Socket,
-    @MessageBody() data: { agentId: string; status: string; user: Agent }
+    @MessageBody() data: { agentId: string; status: string; user: PrismaAgent }
   ) {
+    if (!data?.agentId || !data?.user?.systemCompanyId) {
+      console.warn('[agent:status] missing agentId/systemCompanyId');
+      return;
+    }
+
     console.log(`[SOCKET] Agent ${data.agentId} is now ${data.status}`);
+    this.socketToAgent.set(client.id, data.agentId);
 
-    this.socketToAgent.set(client.id, data.agentId); // ✨ track who sent this
-
-    const existingAgent = this.agents.get(data.agentId);
-
-    if (existingAgent) {
-      existingAgent.status = data.status;
-      existingAgent.lastActivity = new Date();
-      this.agents.set(data.agentId, existingAgent);
+    const existing = this.agents.get(data.agentId);
+    if (existing) {
+      existing.status = data.status;
+      existing.lastActivity = new Date();
     } else {
       this.agents.set(data.agentId, {
         id: data.agentId,
@@ -123,15 +163,18 @@ export class WsGatewayGateway implements OnModuleInit {
         status: data.status,
         extension: data.user.phoneNumber,
         systemCompanyId: data.user.systemCompanyId,
-        department: "Support",
+        department: 'Support',
         lastActivity: new Date(),
         totalCallsToday: 0,
         avgCallDuration: 0,
       });
     }
 
-    const updatedAgent = this.agents.get(data.agentId);
-    this.server.to(`managers:${data.user.systemCompanyId}`).emit('agent:update', updatedAgent);
-  }
+    const updatedAgent = this.agents.get(data.agentId)!;
+    const room = this.getCompanyRoom(data.user.systemCompanyId);
+    console.log(`emitting agent:update to ${room}`);
 
+    this.server.to(room).emit('agent:update', this.toPlain(updatedAgent));
+  }
 }
+
