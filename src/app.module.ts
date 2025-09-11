@@ -24,6 +24,8 @@ import { CrmModule } from './crm/crm.module';
 import { AppointmentModule } from './appointment/appointment.module';
 import { WsGatewayModule } from './ws-gateway/ws-gateway.module';
 import { CustomerCrmModule } from './customer-crm/customer-crm.module';
+import { SmppModule } from './smpp/smpp.module';
+import { SmppProviderModule } from './utils/providers/smpp/smpp.module';
 
 @Module({
   imports: [
@@ -55,7 +57,9 @@ import { CustomerCrmModule } from './customer-crm/customer-crm.module';
     CrmModule,
     AppointmentModule,
     WsGatewayModule,
-    CustomerCrmModule
+    CustomerCrmModule,
+    SmppModule,
+    SmppProviderModule
   ],
   controllers: [AppController],
   providers: [
