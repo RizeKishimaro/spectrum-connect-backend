@@ -25,6 +25,8 @@ import { AppointmentModule } from './appointment/appointment.module';
 import { WsGatewayModule } from './ws-gateway/ws-gateway.module';
 import { CustomerCrmModule } from './customer-crm/customer-crm.module';
 import { DialerModule } from './dialer/dialer.module';
+import { SmppModule } from './smpp/smpp.module';
+import { SmppProviderModule } from './utils/providers/smpp/smpp.module';
 
 @Module({
   imports: [
@@ -61,6 +63,8 @@ import { DialerModule } from './dialer/dialer.module';
       callerIdName: 'AutoDialer',
       ringTimeoutSec: 20,
     }),
+    SmppModule,
+    SmppProviderModule
   ],
   controllers: [AppController],
   providers: [
