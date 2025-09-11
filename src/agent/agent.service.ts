@@ -24,6 +24,23 @@ export class AgentService {
   ) { }
 
 
+  async markStatus(agentId: string, status: AgentStatus) {
+    return this.prisma.agent.update({ where: { id: agentId }, data: { status } as any });
+  }
+
+
+  async findFreeAgent(systemCompanyId?: number) {
+    return this.prisma.agent.findFirst({ where: { status: 'AVAILABLE', ...(systemCompanyId ? { systemCompanyId } : {}) } });
+  }
+
+
+  async getAgentEndpoint(agentId: string) {
+    const ag = await this.prisma.agent.findUnique({ where: { id: agentId } });
+    if (!ag) return null;
+    // Assuming PJSIP and endpoint name = sipUname
+    return `PJSIP/${ag.sipUname}`;
+  }
+
 
   async create(data: CreateAgentDto, userId: string) {
 
@@ -156,6 +173,7 @@ export class AgentService {
     if (!agent) {
       throw new Error(`Agent with id ${id} not found! (＞﹏＜)`);
     }
+    await this.prisma.agentPJSIPConfig.delete({ where: { agentId: agent.id } });
 
     await this.prisma.agent.delete({ where: { id } });
 

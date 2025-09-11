@@ -128,7 +128,7 @@ model IvrFiles {
   updatedAt       DateTime      @updatedAt
   systemCompanyId Int
 
-  @@map("IvrFiles")
+ @@map("IvrFiles")
 }
 
 model SystemCompany {

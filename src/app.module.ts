@@ -24,6 +24,7 @@ import { CrmModule } from './crm/crm.module';
 import { AppointmentModule } from './appointment/appointment.module';
 import { WsGatewayModule } from './ws-gateway/ws-gateway.module';
 import { CustomerCrmModule } from './customer-crm/customer-crm.module';
+import { DialerModule } from './dialer/dialer.module';
 
 @Module({
   imports: [
@@ -55,7 +56,11 @@ import { CustomerCrmModule } from './customer-crm/customer-crm.module';
     CrmModule,
     AppointmentModule,
     WsGatewayModule,
-    CustomerCrmModule
+    CustomerCrmModule,
+    DialerModule.forRoot({
+      callerIdName: 'AutoDialer',
+      ringTimeoutSec: 20,
+    }),
   ],
   controllers: [AppController],
   providers: [

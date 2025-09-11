@@ -64,6 +64,16 @@ export class CustomerCrmService {
     await this.getById(systemCompanyId, id);
     return this.prisma.services.delete({ where: { id } });
   }
+  async nextLead(systemCompanyId: number) {
+    const lead = await this.prisma.cRMLeads.findFirst({
+      where: { systemCompanyId, isContacted: false },
+      orderBy: { createdAt: 'asc' },
+    });
+    if (!lead) return null;
+    // soft lock lead in DB so other workers won't grab it (best with a field)
+    await this.prisma.cRMLeads.update({ where: { id: lead.id }, data: { isContacted: true } });
+    return lead;
+  }
 
   // --------- Leads ----------
 

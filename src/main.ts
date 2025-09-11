@@ -9,6 +9,25 @@ import { join } from 'path';
 import * as myIVRTree from './ivr-config.json';
 import { ParkedCallService } from './parked-call/parked-call.service';
 import { PrismaService } from './utils/prisma/prisma.service';
+import { promises as fs } from "fs";
+import { Logger } from "@nestjs/common";
+
+async function checkFileAccess(path: string) {
+  try {
+    // Check read/write access
+    await fs.access(path, fs.constants.R_OK | fs.constants.W_OK);
+    // Try writing a tiny test (append+remove immediately)
+    await fs.appendFile(path, "\n; test access\n");
+    Logger.log(`✅ File access check passed for: ${path}`, "PermissionCheck");
+    return true;
+  } catch (err: any) {
+    Logger.error(
+      `❌ Cannot access ${path} (${err.code}) - shutting down`,
+      "PermissionCheck"
+    );
+    return false;
+  }
+}
 
 async function bootstrap() {
   const app = await NestFactory.create<NestExpressApplication>(AppModule);
@@ -18,6 +37,11 @@ async function bootstrap() {
     // origin: '*',
     credentials: true,
   });
+  const ok = await checkFileAccess("/etc/asterisk/pjsip-agent.conf");
+  if (!ok) {
+    await app.close();
+    process.exit(1);
+  }
 
   app.useStaticAssets(join(process.cwd(), 'public'));
   const callService = app.get(CallService);

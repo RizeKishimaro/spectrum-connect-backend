@@ -65,5 +65,18 @@ export class AMIProvider implements OnModuleInit {
       this.amiConnection.disconnect();
     }
   }
+  originate({ exten, context, priority = 1, callerId, channel }: { exten: string; context: string; priority?: number; callerId?: string; channel: string; }) {
+    const action = [
+      'Action: Originate',
+      `Channel: ${channel}`,
+      `Exten: ${exten}`,
+      `Context: ${context}`,
+      `Priority: ${priority}`,
+      callerId ? `CallerID: ${callerId}` : undefined,
+      'Async: true',
+      '',
+    ].filter(Boolean).join('\r\n');
+    this.amiConnection.action(action + '\r\n');
+  }
 
 }
