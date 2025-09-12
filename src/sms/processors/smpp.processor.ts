@@ -34,10 +34,11 @@ export class SMPPSmsConsumer extends WorkerHost {
 
 
     try {
+      console.log(numbers)
       const pdu = await new Promise((resolve, reject) => {
         this.smppProvider.session.submit_sm(
           {
-            source_addr: sender,
+            source_addr: "SMS",
             destination_addr: numbers,
             short_message: content,
           },
