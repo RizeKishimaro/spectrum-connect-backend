@@ -13,6 +13,7 @@ export class SmsService {
     @InjectQueue('limitless') private smsQueue: Queue,
     @InjectQueue("commpeak") private commpeakQueue: Queue,
     @InjectQueue("topying") private TopyingQueue: Queue,
+    @InjectQueue("smpp-sms") private smppQueue: Queue,
     private readonly prisma: PrismaService
   ) { }
 
@@ -251,6 +252,75 @@ export class SmsService {
       count: numberList.length,
     };
   }
+
+  async sendSMPPSms(data: any) {
+    const numberList = Array.isArray(data.numbers)
+      ? data.numbers
+      : typeof data.numbers === "string"
+        ? data.numbers.split(",").map((n) => n.trim()).filter(n => n.length > 0)
+        : [];
+
+    if (numberList.length === 0) {
+      console.log("📵 Bad phone number list");
+      throw new Error("No valid numbers provided nya~!");
+    }
+
+    const markupMultiplier = 1.2;
+    const basePrice = 0.012; // 💸 Default Commpeak rate per SMS
+    const finalPrice = parseFloat((basePrice * markupMultiplier).toFixed(4));
+
+    const pendingLogs = await Promise.all(
+      numberList.map(async (phone) => {
+        const processedMessage = this.replaceRandomPlaceholders(data.content);
+        const log = await this.prisma.smsLog.create({
+          data: {
+            sender: data.sender,
+            systemCompanyId: data.companyId,
+            numbers: phone,
+            content: processedMessage,
+            status: "pending",
+            success: 0,
+            service: "GOLD",
+            failed: 0,
+            route: 0,
+            charged: 0,
+            apiRaw: {},
+            direction: "outbound",
+          },
+        });
+
+        return {
+          phone,
+          processedMessage,
+          logId: log.id,
+        };
+      })
+    );
+
+    for (let i = 0; i < pendingLogs.length; i++) {
+      const { phone, processedMessage, logId, sender } = pendingLogs[i];
+
+      console.log(`📤 Queuing Commpeak SMS to ${phone}`);
+
+      await this.smppQueue.add("send", {
+        numbers: phone,
+        message: processedMessage,
+        content: processedMessage,
+        systemCompanyId: data.companyId,
+        sender: data.sender,
+        smsLogId: logId,
+        billingDeduct: finalPrice,
+        senderId: sender
+      });
+    }
+
+    return {
+      status: "queued",
+      count: numberList.length,
+    };
+  }
+
+
 
 
 } 
