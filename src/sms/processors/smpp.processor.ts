@@ -5,13 +5,14 @@ import { Job } from 'bullmq';
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from 'src/utils/prisma/prisma.service';
 import { SmppProvider } from 'src/utils/providers/smpp/smpp.service';
+import { SmppWholesaleProvider } from 'src/utils/providers/smpp/smpp-wholesale.service';
 
 @Processor('smpp-sms')
 @Injectable()
 export class SMPPSmsConsumer extends WorkerHost {
   constructor(
     private readonly prisma: PrismaService,
-    private readonly smppProvider: SmppProvider, // connection manager
+    private readonly smppProvider: SmppWholesaleProvider, // connection manager
   ) {
     super();
   }

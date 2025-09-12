@@ -19,7 +19,7 @@ export class SmppSimboxProvider implements OnModuleInit {
           console.error("❌ SMPP bind failed:", pdu);
           process.exit(1);
         } else {
-          console.log("✅ SMPP connected & bound as transceiver");
+          console.log("✅ SMPP Simbox connected & bound as transceiver");
         }
       },
     );
