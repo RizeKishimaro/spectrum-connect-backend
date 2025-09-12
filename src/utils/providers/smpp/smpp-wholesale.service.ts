@@ -8,6 +8,12 @@ export class SmppWholesaleProvider implements OnModuleInit {
 
   onModuleInit() {
     this.session = smpp.connect({ url: process.env.SMPP_URL });
+    console.log({
+      url: process.env.SMPP_URL,
+      user: process.env.SMPP_WHOLESALE_USERNAME,
+      pass: process.env.SMPP_WHOLESALE_PASSWORD,
+    });
+
 
     this.session.bind_transceiver(
       {
