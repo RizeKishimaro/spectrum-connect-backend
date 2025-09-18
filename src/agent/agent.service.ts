@@ -34,10 +34,16 @@ export class AgentService {
   }
 
 
+  async findAllFreeAgent(systemCompanyId?: number) {
+    return this.prisma.agent.findMany({ where: { status: 'AVAILABLE', ...(systemCompanyId ? { systemCompanyId } : {}) } });
+  }
+
+
   async getAgentEndpoint(agentId: string) {
     const ag = await this.prisma.agent.findUnique({ where: { id: agentId } });
+
+    const sipProvider = await this.prisma.sIPProvider.findFirst({ where: { SystemCompany: { some: { id: ag?.systemCompanyId } } } });
     if (!ag) return null;
-    // Assuming PJSIP and endpoint name = sipUname
     return `PJSIP/${ag.sipUname}`;
   }
 

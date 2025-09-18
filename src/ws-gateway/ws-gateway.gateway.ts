@@ -166,10 +166,12 @@ export class WsGatewayGateway implements OnModuleInit {
     const room = companyRoom(data.user.systemCompanyId);
     console.log(`emitting agent:update -> ${room} + ${ADMIN_ROOM}`);
 
-    // company users (their company only)
     this.server.to(room).emit('agent:update', this.toPlain(updated));
-    // admins (all companies)
     this.server.to(ADMIN_ROOM).emit('agent:update', this.toPlain(updated));
+  }
+  emit(event: string, payload: any) {
+    const room = companyRoom(payload.systemCompanyId);
+    this.server.to(room).emit(event, payload);
   }
 }
 

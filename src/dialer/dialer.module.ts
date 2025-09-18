@@ -1,7 +1,5 @@
 import { Module, DynamicModule, Global } from '@nestjs/common';
-import { DialerService } from './dialer.service';
 import { DialerController } from './dialer.controller';
-import { AriClient } from 'src/utils/ari/ari-utils';
 import { AgentService } from 'src/agent/agent.service';
 import { CustomerCrmService } from 'src/customer-crm/customer-crm.service';
 import { LockService } from './locks/lock.service';
@@ -11,6 +9,10 @@ import { JwtService } from '@nestjs/jwt';
 import { SystemCompanyService } from 'src/system-company/system-company.service';
 import { SystemManagerService } from 'src/system-manager/system-manager.service';
 import { ParkedCallService } from 'src/parked-call/parked-call.service';
+import { DialerService } from './dialer.service';
+import { ARI_CLIENT } from 'src/utils/ari/ari.module';
+import * as Ari from 'ari-client';
+import { WsGatewayGateway } from 'src/ws-gateway/ws-gateway.gateway';
 
 
 export interface DialerModuleOptions {
@@ -37,19 +39,28 @@ export class DialerModule {
 
     return {
       module: DialerModule,
-      controllers: [DialerController], // 💡 make sure controller is here
+      controllers: [DialerController],
       providers: [
-        { provide: 'DIALER_OPTS', useValue: options },
+        {
+          provide: ARI_CLIENT,
+          useFactory: async () => {
+            const ari = await Ari.connect(process.env.ARI_URL as string, process.env.ARI_USERNAME as string, process.env.ARI_PASSWORD as string, (error, client) => {
+              client.start(process.env.ARI_APP as string)
+            });
+            return ari;
+          },
+        },
+
         DialerService,
-        AriClient,
         AgentService,
         CustomerCrmService,
         LockService,
         PrismaService,
-        DialerGateway,
         SystemManagerService,
         ParkedCallService,
-        JwtService
+        JwtService,
+        WsGatewayGateway
+
       ],
       exports: [DialerService],
     };

@@ -5,11 +5,16 @@ import { deleteIVRTree, generateDialplan, IvrNode, saveIvrDialplan, writeDialpla
 import { extname, join } from 'path';
 import ffmpeg from 'fluent-ffmpeg';
 import * as fs from 'fs';
-import { PrismaService } from 'src/utils/prisma/prisma.service';
 import { AMIProvider } from 'src/utils/providers/ami/ami-provider.service';
 import { exec as execCb } from 'child_process'
 import { promisify } from 'util';
 import si from 'systeminformation'
+import { CreateSipEndpointDto } from './dto/create-sip-endpoints.dto';
+import { UpdateSipEndpointDto } from './dto/update-sip-endpoint.dto';
+import { UpdateExtensionDto } from './dto/update-extension.dto';
+import { CreateExtensionDto } from './dto/create-extension.dto';
+import { PrismaService } from 'src/utils/prisma/prisma.service';
+import { UserSettingsDto } from './dto/user-settings.dto';
 
 const exec = promisify(execCb)
 
@@ -553,5 +558,132 @@ export class SystemManagerService {
       console.error("Delete error:", err)
       throw new BadRequestException(`Couldn’t delete file! Error: ${err.message}`)
     }
+  }
+
+  async create(dto: CreateSipEndpointDto) {
+    return this.prismaService.sIPEndpoints.create({
+      data: {
+        name: dto.name,
+        ipHost: dto.ipHost ?? '0.0.0.0',
+        sipTech: dto.sipTech ?? 'pjsip',
+      },
+    });
+  }
+
+  async findAll(search?: string) {
+    return this.prismaService.sIPEndpoints.findMany({
+      where: search
+        ? {
+          OR: [
+            { name: { contains: search, mode: 'insensitive' } },
+            { ipHost: { contains: search } },
+            { sipTech: { contains: search, mode: 'insensitive' } },
+          ],
+        }
+        : undefined,
+      orderBy: { createdAt: 'desc' },
+      include: { settings: true },
+    });
+  }
+
+  async findOne(id: string) {
+    const item = await this.prismaService.sIPEndpoints.findUnique({
+      where: { id },
+      include: { settings: true },
+    });
+    if (!item) throw new NotFoundException('SIPEndpoint not found');
+    return item;
+  }
+
+  async update(id: string, dto: UpdateSipEndpointDto) {
+    await this.ensureExists(id);
+    return this.prismaService.sIPEndpoints.update({
+      where: { id },
+      data: {
+        name: dto.name,
+        ipHost: dto.ipHost,
+        sipTech: dto.sipTech,
+      },
+    });
+  }
+
+  async remove(id: string) {
+    await this.ensureExists(id);
+    await this.prismaService.sIPEndpoints.delete({ where: { id } });
+    return { success: true };
+  }
+
+  private async ensureExists(id: string) {
+    const hit = await this.prismaService.sIPEndpoints.findUnique({ where: { id } });
+    if (!hit) throw new NotFoundException('SIPEndpoint not found');
+  }
+
+
+  createExtension(dto: CreateExtensionDto) {
+    return this.prismaService.extensions.create({ data: { name: dto.name } });
+  }
+
+  findExtensions(search?: string) {
+    return this.prismaService.extensions.findMany({
+      where: search ? { name: { contains: search, mode: 'insensitive' } } : undefined,
+      orderBy: { createdAt: 'desc' },
+      include: { settings: true },
+    });
+  }
+
+  async findExtension(id: string) {
+    const hit = await this.prismaService.extensions.findUnique({
+      where: { id },
+      include: { settings: true },
+    });
+    if (!hit) throw new NotFoundException('Extension not found');
+    return hit;
+  }
+
+  async updateExtension(id: string, dto: UpdateExtensionDto) {
+    await this.ensureExists(id);
+    return this.prismaService.extensions.update({ where: { id }, data: { name: dto.name } });
+  }
+
+  async removeExtension(id: string) {
+    await this.ensureExists(id);
+    await this.prismaService.extensions.delete({ where: { id } });
+    return { success: true };
+  }
+
+  private async ensureExistsExtension(id: string) {
+    const hit = await this.prismaService.extensions.findUnique({ where: { id } });
+    if (!hit) throw new NotFoundException('Extension not found');
+  }
+
+  async saveUserSettings(settingsDto: UserSettingsDto, systemCompanyId: number) {
+    const settings = await this.prismaService.settings.findFirst({
+      where: { systemCompanyId }
+    });
+    console.log(settings)
+    if (settings) {
+      const updatedSettings = await this.prismaService.settings.update({
+        where: { id: settings.id },
+        data: {
+          ...settings,
+          ...settingsDto
+        }
+      })
+      return updatedSettings;
+    } else {
+      const updatedSettings = await this.prismaService.settings.create({
+        data: {
+          ...settingsDto,
+          systemCompanyId
+        }
+      })
+      return updatedSettings;
+    }
+  }
+  async getUserSettings(systemCompanyId: number) {
+    const settings = await this.prismaService.settings.findFirst({
+      where: { systemCompanyId }
+    });
+    return settings;
   }
 }

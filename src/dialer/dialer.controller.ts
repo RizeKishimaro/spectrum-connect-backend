@@ -1,7 +1,7 @@
 import { Body, Controller, Param, Post } from '@nestjs/common';
-import { DialerService } from './dialer.service';
 import { StartDialDto } from './dto/start-dial.dto';
 import { StopDialDto } from './dto/stop-dial.dto';
+import { DialerService } from './dialer.service';
 
 
 @Controller('dialer')

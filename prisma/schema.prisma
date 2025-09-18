@@ -128,7 +128,7 @@ model IvrFiles {
   updatedAt       DateTime      @updatedAt
   systemCompanyId Int
 
- @@map("IvrFiles")
+  @@map("IvrFiles")
 }
 
 model SystemCompany {
@@ -150,6 +150,7 @@ model SystemCompany {
   CompanyMembers       CompanyMembers[]
   Services             Services[]
   CRMAppointmentStatus CRMAppointmentStatus[]
+  Settings             Settings[]
 }
 
 model SIPProvider {
@@ -322,6 +323,43 @@ model Services {
   updatedAt  DateTime  @updatedAt
   CRMLeads   CRMLeads? @relation(fields: [cRMLeadsId], references: [id])
   cRMLeadsId String?
+}
+
+model SIPEndpoints {
+  id        String     @id @default(cuid())
+  createdAt DateTime   @default(now())
+  updatedAt DateTime   @updatedAt
+  name      String
+  ipHost    String     @default("0.0.0.0")
+  sipTech   String     @default("pjsip")
+  settings  Settings[]
+}
+
+model Extensions {
+  id        String     @id @default(cuid())
+  createdAt DateTime   @default(now())
+  updatedAt DateTime   @updatedAt
+  name      String
+  settings  Settings[]
+}
+
+model Settings {
+  id        String   @id @default(cuid())
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  blastCount   Int     @default(2)
+  callLimit    Int     @default(100)
+  introFileUrl String? // path to client intro audio
+
+  sipProvider   SIPEndpoints? @relation(fields: [sipProviderId], references: [id])
+  sipProviderId String?
+
+  systemCompanyId Int
+  systemCompany   SystemCompany @relation(fields: [systemCompanyId], references: [id])
+
+  ivr   Extensions? @relation(fields: [ivrId], references: [id])
+  ivrId String?
 }
 
 enum AppointmentStatus {

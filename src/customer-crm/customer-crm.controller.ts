@@ -55,6 +55,10 @@ export class CustomerCrmController {
   createLead(@Body() dto: CreateLeadDto, @Req() req: ExpressRequest) {
     return this.service.createLead(dto, req);
   }
+  @Post('leads/bulk')
+  createBulkLeads(@Body() dto: CreateLeadDto, @Req() req: ExpressRequest) {
+    return this.service.createBulkLeads(dto, req);
+  }
 
   @Get('leads')
   listLeads(@Query() q: QueryDto) {

@@ -69,6 +69,7 @@ export class CustomerCrmService {
       where: { systemCompanyId, isContacted: false },
       orderBy: { createdAt: 'asc' },
     });
+    console.log(lead)
     if (!lead) return null;
     // soft lock lead in DB so other workers won't grab it (best with a field)
     await this.prisma.cRMLeads.update({ where: { id: lead.id }, data: { isContacted: true } });
@@ -106,6 +107,27 @@ export class CustomerCrmService {
   }
 
 
+  async createBulkLeads(dto, req) {
+    const systemCompanyId = req.user.user.systemCompanyId;
+
+    return this.prisma.cRMLeads.createMany({
+      data: dto.leads.map((lead) => ({
+        email: lead.email,
+        phone: lead.phone,
+        companyName: lead.companyName,
+        employeeCount: lead.employeeCount,
+        companyCount: lead.companyCount,
+        isContacted: lead.isContacted,
+        contactStatus: lead.contactStatus,
+        description: lead.description,
+        address: lead.address,
+        systemCompanyId,
+      })),
+      skipDuplicates: true,
+    });
+  }
+
+
   async listLeads(q: QueryDto) {
     const where: Prisma.CRMLeadsWhereInput = q.search
       ? {
@@ -115,8 +137,11 @@ export class CustomerCrmService {
           { companyName: { contains: q.search, mode: 'insensitive' } },
           { address: { contains: q.search, mode: 'insensitive' } },
         ],
+        isContacted: false
       }
-      : {};
+      : {
+        isContacted: false
+      };
 
     const skip = (q.page ?? 0) * (q.pageSize ?? 20);
     const take = q.pageSize ?? 20;

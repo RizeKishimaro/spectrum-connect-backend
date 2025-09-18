@@ -10,7 +10,7 @@ import * as myIVRTree from './ivr-config.json';
 import { ParkedCallService } from './parked-call/parked-call.service';
 import { PrismaService } from './utils/prisma/prisma.service';
 import { promises as fs } from "fs";
-import { Logger } from "@nestjs/common";
+import { Logger, ValidationPipe } from "@nestjs/common";
 
 async function checkFileAccess(path: string) {
   try {
@@ -56,6 +56,13 @@ async function bootstrap() {
     prismaService,
   );
 
+  app.useGlobalPipes(
+    new ValidationPipe({
+      transform: true,
+      whitelist: true,
+    }),
+  )
+
   const config = new DocumentBuilder()
     .setTitle('Spectrem Connect API 🪐')
     .setDescription('Kawaii API doc for Subscription SIP System nya~ 💕')
@@ -64,7 +71,7 @@ async function bootstrap() {
     .build();
 
   const document = SwaggerModule.createDocument(app, config);
-  SwaggerModule.setup('api-docs', app, document); // visit: http://localhost:3000/api-docs
+  SwaggerModule.setup('api-docs', app, document);
   await app.listen(process.env.PORT ?? 8000, '0.0.0.0');
 }
 bootstrap();

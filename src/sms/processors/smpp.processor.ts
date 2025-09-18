@@ -5,13 +5,17 @@ import { Job } from 'bullmq';
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from 'src/utils/prisma/prisma.service';
 import { SmppProvider } from 'src/utils/providers/smpp/smpp.service';
+import { SmppWholesaleProvider } from 'src/utils/providers/smpp/smpp-wholesale.service';
+import { SmppSimboxProvider } from 'src/utils/providers/smpp/smpp-simbox.processor';
 
 @Processor('smpp-sms')
 @Injectable()
 export class SMPPSmsConsumer extends WorkerHost {
   constructor(
     private readonly prisma: PrismaService,
-    private readonly smppProvider: SmppProvider, // connection manager
+    private readonly smppProvider: SmppProvider,
+    private readonly smppWholesaleProvider: SmppWholesaleProvider,
+    private readonly smppSimboxProvider: SmppSimboxProvider
   ) {
     super();
   }
@@ -35,11 +39,21 @@ export class SMPPSmsConsumer extends WorkerHost {
 
     try {
       console.log(numbers)
+
       const pdu = await new Promise((resolve, reject) => {
         this.smppProvider.session.submit_sm(
           {
-            source_addr: "SMS",
-            destination_addr: numbers,
+            source_addr: sender, // Sender ID
+            destination_addr: numbers, // Recipient
+
+            // TON/NPI for source
+            source_addr_ton: 5, // 5 = Alphanumeric (for sender ID "SMS")
+            source_addr_npi: 0, // 0 = Unknown
+
+            // TON/NPI for destination
+            dest_addr_ton: 1, // 1 = International (E.164 numbers)
+            dest_addr_npi: 1, // 1 = ISDN (E.164)
+
             short_message: content,
           },
           (pdu) => {

@@ -1,4 +1,4 @@
-import { BadRequestException, Body, Controller, Delete, Get, Param, Post, Query, Req, Sse, UploadedFile, UseInterceptors } from '@nestjs/common';
+import { BadRequestException, Body, Controller, Delete, Get, Param, Patch, Post, Query, Req, Sse, UploadedFile, UseInterceptors } from '@nestjs/common';
 import { SystemManagerService } from './system-manager.service';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { diskStorage } from 'multer';
@@ -9,6 +9,11 @@ import * as fs from 'fs';
 import { ExpressRequest } from 'src/types/other';
 import { PublicRoute } from 'src/utils/decorators/public.decorator';
 import { interval, map, Observable } from 'rxjs';
+import { CreateExtensionDto } from './dto/create-extension.dto';
+import { UpdateExtensionDto } from './dto/update-extension.dto';
+import { CreateSipEndpointDto } from './dto/create-sip-endpoints.dto';
+import { UpdateSipEndpointDto } from './dto/update-sip-endpoint.dto';
+import { UserSettingsDto } from './dto/user-settings.dto';
 
 @Controller('system-manager')
 export class SystemManagerController {
@@ -64,6 +69,55 @@ export class SystemManagerController {
       pjsipPeers,
       response
     };
+  }
+
+  @Post("/create-extension/")
+  createExtension(@Body() dto: CreateExtensionDto) {
+    return this.systemManagerService.createExtension(dto);
+  }
+
+  @Get("extensions")
+  findExtensions(@Query('search') search?: string) {
+    return this.systemManagerService.findExtensions(search);
+  }
+
+  @Get('extensions/:id')
+  findExtension(@Param('id') id: string) {
+    return this.systemManagerService.findExtension(id);
+  }
+
+  @Patch('extensions/:id')
+  updateExtension(@Param('id') id: string, @Body() dto: UpdateExtensionDto) {
+    return this.systemManagerService.updateExtension(id, dto);
+  }
+
+  @Delete('extensions/:id')
+  removeExtension(@Param('id') id: string) {
+    return this.systemManagerService.removeExtension(id);
+  }
+  @Post("sip-endpoint")
+  create(@Body() dto: CreateSipEndpointDto) {
+    return this.systemManagerService.create(dto);
+  }
+
+  @Get("sip-endpoints")
+  findAll(@Query('search') search?: string) {
+    return this.systemManagerService.findAll(search);
+  }
+
+  @Get('sip-endpoints/:id')
+  findOne(@Param('id') id: string) {
+    return this.systemManagerService.findOne(id);
+  }
+
+  @Patch('sip-endpoints/:id')
+  update(@Param('id') id: string, @Body() dto: UpdateSipEndpointDto) {
+    return this.systemManagerService.update(id, dto);
+  }
+
+  @Delete('sip-endpoints/:id')
+  remove(@Param('id') id: string) {
+    return this.systemManagerService.remove(id);
   }
 
 
@@ -145,4 +199,12 @@ export class SystemManagerController {
     return this.systemManagerService.spyOnAgents(account, spyaccount);
   }
 
+  @Post("save-settings")
+  async saveUserSettings(@Body() settingsDto: UserSettingsDto, @Req() req: ExpressRequest) {
+    return this.systemManagerService.saveUserSettings(settingsDto, req.user.user.systemCompanyId)
+  }
+  @Get("get-settings")
+  async getUserSettings(@Req() req: ExpressRequest) {
+    return this.systemManagerService.getUserSettings(req.user.user.systemCompanyId)
+  }
 }
