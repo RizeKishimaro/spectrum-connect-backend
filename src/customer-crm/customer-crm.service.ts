@@ -1,6 +1,6 @@
 // src/customer-crm/customer-crm.service.ts
 import { Injectable, NotFoundException } from '@nestjs/common';
-import { Prisma, PrismaClient } from '@prisma/client';
+import { CRMLeads, Prisma, PrismaClient } from '@prisma/client';
 import { CreateLeadDto, UpdateLeadDto } from './dto/lead.dto';
 import { QueryDto } from './dto/query.dto';
 import { CreateAppointmentDto, UpdateAppointmentDto } from './dto/appointment.dto';
@@ -66,16 +66,20 @@ export class CustomerCrmService {
   }
   async nextLead(systemCompanyId: number) {
     const lead = await this.prisma.cRMLeads.findFirst({
-      where: { systemCompanyId, isContacted: false },
-      orderBy: { createdAt: 'asc' },
+      where: { systemCompanyId, isContacted: false, locked: false },
+      orderBy: { createdAt: "asc" },
     });
-    console.log(lead)
+
     if (!lead) return null;
-    // soft lock lead in DB so other workers won't grab it (best with a field)
-    await this.prisma.cRMLeads.update({ where: { id: lead.id }, data: { isContacted: true } });
+
+    // Soft lock the lead so no one else grabs it
+    await this.prisma.cRMLeads.update({
+      where: { id: lead.id },
+      data: { locked: true },
+    });
+
     return lead;
   }
-
   // --------- Leads ----------
 
 
@@ -128,20 +132,36 @@ export class CustomerCrmService {
   }
 
 
-  async listLeads(q: QueryDto) {
-    const where: Prisma.CRMLeadsWhereInput = q.search
+
+
+  async listLeads(q: QueryDto, req: ExpressRequest) {
+    const baseWhere: Prisma.CRMLeadsWhereInput = q.search
       ? {
         OR: [
-          { email: { contains: q.search, mode: 'insensitive' } },
-          { phone: { contains: q.search, mode: 'insensitive' } },
-          { companyName: { contains: q.search, mode: 'insensitive' } },
-          { address: { contains: q.search, mode: 'insensitive' } },
+          { email: { contains: q.search, mode: "insensitive" } },
+          { phone: { contains: q.search, mode: "insensitive" } },
+          { companyName: { contains: q.search, mode: "insensitive" } },
+          { address: { contains: q.search, mode: "insensitive" } },
         ],
-        isContacted: false
       }
-      : {
-        isContacted: false
-      };
+      : {};
+
+    const agent = await this.prisma.agent.findUnique({
+      where: { id: req.user.user.id },
+    });
+
+    // 🔒 If agent exists, restrict to uncontacted + unlocked leads
+    const where: Prisma.CRMLeadsWhereInput = agent
+      ? {
+        AND: [
+          baseWhere,
+          {
+            isContacted: false,
+            locked: false,
+          },
+        ],
+      }
+      : baseWhere;
 
     const skip = (q.page ?? 0) * (q.pageSize ?? 20);
     const take = q.pageSize ?? 20;
@@ -151,7 +171,7 @@ export class CustomerCrmService {
         where,
         skip,
         take: +take,
-        orderBy: parseOrderBy(q.orderBy) ?? [{ createdAt: 'desc' }],
+        orderBy: parseOrderBy(q.orderBy) ?? [{ createdAt: "desc" }],
         include: { Appointment: true, systemCompany: true },
       }),
       this.prisma.cRMLeads.count({ where }),
@@ -159,6 +179,8 @@ export class CustomerCrmService {
 
     return { items, total, page: q.page ?? 0, pageSize: take };
   }
+
+
 
   async getLead(id: string) {
     const item = await this.prisma.cRMLeads.findUnique({

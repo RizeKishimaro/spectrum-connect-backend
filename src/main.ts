@@ -16,8 +16,6 @@ async function checkFileAccess(path: string) {
   try {
     // Check read/write access
     await fs.access(path, fs.constants.R_OK | fs.constants.W_OK);
-    // Try writing a tiny test (append+remove immediately)
-    await fs.appendFile(path, "\n; test access\n");
     Logger.log(`✅ File access check passed for: ${path}`, "PermissionCheck");
     return true;
   } catch (err: any) {

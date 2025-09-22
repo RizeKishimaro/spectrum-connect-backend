@@ -1,7 +1,7 @@
 // src/customer-crm/customer-crm.controller.ts
 import { Body, Controller, Delete, Get, Param, Patch, Post, Query, Req } from '@nestjs/common';
 import { CustomerCrmService } from './customer-crm.service';
-import { CreateLeadDto, UpdateLeadDto } from './dto/lead.dto';
+import { CreateLeadDto, CreateLeadsDto, UpdateLeadDto } from './dto/lead.dto';
 import { QueryDto } from './dto/query.dto';
 import { CreateAppointmentDto, UpdateAppointmentDto } from './dto/appointment.dto';
 import { CreateStatusDto, UpdateStatusDto } from './dto/status.dto';
@@ -56,13 +56,13 @@ export class CustomerCrmController {
     return this.service.createLead(dto, req);
   }
   @Post('leads/bulk')
-  createBulkLeads(@Body() dto: CreateLeadDto, @Req() req: ExpressRequest) {
+  createBulkLeads(@Body() dto: CreateLeadsDto, @Req() req: ExpressRequest) {
     return this.service.createBulkLeads(dto, req);
   }
 
   @Get('leads')
-  listLeads(@Query() q: QueryDto) {
-    return this.service.listLeads(q);
+  listLeads(@Query() q: QueryDto, @Req() req: ExpressRequest) {
+    return this.service.listLeads(q, req);
   }
 
   @Get('leads/:id')

@@ -1,5 +1,6 @@
-import { Controller, Get } from '@nestjs/common';
+import { Controller, Get, Req } from '@nestjs/common';
 import { AppService } from './app.service';
+import { ExpressRequest } from './types/other';
 
 @Controller()
 export class AppController {
@@ -22,7 +23,7 @@ export class AppController {
 
   // dashboard.controller.ts
   @Get("summary")
-  async getSummary() {
-    return this.appService.getSummary()
+  async getSummary(@Req() req: ExpressRequest) {
+    return this.appService.getSummary(req.user.user.systemCompanyId)
   }
 }

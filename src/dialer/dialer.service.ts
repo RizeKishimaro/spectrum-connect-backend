@@ -1,5 +1,5 @@
 
-import { Injectable, Inject, Logger, OnModuleInit } from '@nestjs/common';
+import { Injectable, Inject, Logger, OnModuleInit, BadRequestException } from '@nestjs/common';
 import { EventEmitter } from 'events';
 import { Client, Channel } from 'ari-client';
 import { ARI_CLIENT } from 'src/utils/ari/ari.module';
@@ -8,10 +8,11 @@ import { LockService } from './locks/lock.service';
 import { CustomerCrmService } from 'src/customer-crm/customer-crm.service';
 import { AgentService } from 'src/agent/agent.service';
 import { AMIProvider } from 'src/utils/providers/ami/ami-provider.service';
-import { $Enums } from '@prisma/client';
+import { $Enums, Agent } from '@prisma/client';
 import { WsGatewayGateway } from 'src/ws-gateway/ws-gateway.gateway';
+import { randomUUID } from 'crypto';
 
-type Meta = { callLogId: string; role: 'customer' | 'agent'; agentId?: string | null };
+type Meta = { callLogId: string; role: 'customer' | 'agent'; agentId?: string | null, phone?: string | null, leadId?: string | null };
 
 type PendingTransfer = {
   digits: string[];
@@ -29,6 +30,7 @@ export class DialerService extends EventEmitter implements OnModuleInit {
   private onHoldTimers: Record<string, NodeJS.Timeout> = {};
   private holdQueue: Record<string, string> = {}; // callLogId -> customerChannelId
   private holdTickTimer?: NodeJS.Timeout;
+  private agentTimers: Record<string, NodeJS.Timeout> = {};
 
   // transfers
   private pendingTransfers = new Map<string, PendingTransfer>();
@@ -62,8 +64,9 @@ export class DialerService extends EventEmitter implements OnModuleInit {
       this.onDtmfReceived(ev, ch).catch((e) => this.logger.error(e)),
     );
 
+
     // start a tiny scheduler to re-attempt pairing held customers with agents
-    this.startHoldTicker();
+    // this.startHoldTicker();
   }
 
   // ===== Public controls =====================================================
@@ -71,7 +74,31 @@ export class DialerService extends EventEmitter implements OnModuleInit {
 
   async startAgentDial(agentId: string, dto: { slots?: number }) {
     const agent = await this.prisma.agent.findUnique({ where: { id: agentId } });
-    if (!agent) throw new Error('Agent not found');
+    if (!agent) throw new BadRequestException("Invalid Agent Detected By System!")
+    const agentInformation = await this.prisma.agentInformation.findFirst({
+      where: {
+        agentId: agent.id
+      }
+    })
+    let agentSettings;
+    if (!agentInformation) {
+      agentSettings = await this.prisma.agentInformation.create({
+        data: {
+          agentId: agent.id
+        }
+      })
+    } else {
+      agentSettings = agentInformation
+    }
+    if (!agent) throw new BadRequestException('Agent not found');
+    await this.prisma.agentInformation.update({
+      where: {
+        id: agentSettings.id,
+      },
+      data: {
+        isInPredictiveDialer: true
+      }
+    })
     const { slots = 1 } = dto;
 
     // Track how many concurrent calls this agent can handle
@@ -81,74 +108,141 @@ export class DialerService extends EventEmitter implements OnModuleInit {
 
     this.ws.emit('dialer:start', { agentId, name: agent.name, systemCompanyId: agent.systemCompanyId, slots });
 
-    await this.blastDial(agent.systemCompanyId);
+    await this.blastDial(agent.systemCompanyId, agent.id);
   }
 
 
-  async stopAgentDial(agentId: string, reason = 'stopped') {
+  async getAgentMetadata(agentId: string) {
+    const agent = await this.prisma.agent.findUnique({
+      where: {
+        id: agentId
+      }
+    });
+    if (!agent) throw new BadRequestException("Agent Not Found Please Login Again");
+    const agentMetadata = await this.prisma.agentInformation.findFirst({
+      where: {
+        agentId: agent.id
+      }
+    });
+    return agentMetadata;
+  }
+
+
+  async stopAgentDial(agentId: string, reason = "stopped") {
     delete this.agentRunning[agentId];
+
+    if (this.agentTimers[agentId]) {
+      clearTimeout(this.agentTimers[agentId]);
+      delete this.agentTimers[agentId];
+    }
+
     const agent = await this.prisma.agent.findUnique({ where: { id: agentId } });
-    // await this.agents.markStatus(agentId, 'OFFLINE');
+
+    if (!agent) throw new BadRequestException('Agent not found');
+    const agentInformation = await this.prisma.agentInformation.findFirst({
+      where: {
+        agentId: agent.id
+      }
+    })
+    let agentSettings;
+    if (!agentInformation) {
+      agentSettings = await this.prisma.agentInformation.create({
+        data: {
+          agentId: agent.id
+        }
+      })
+    } else {
+      agentSettings = agentInformation
+    }
+    await this.prisma.agentInformation.update({
+      where: {
+        id: agentSettings.id,
+      },
+      data: {
+        isInPredictiveDialer: false
+      }
+    })
     if (!agent) return;
-    this.ws.emit('dialer:stop', { agentId, name: agent.name, systemCompanyId: agent.systemCompanyId, reason });
+
+    this.ws.emit("dialer:stop", {
+      agentId,
+      name: agent.name,
+      systemCompanyId: agent.systemCompanyId,
+      reason,
+    });
+
+    this.logger.log(`🛑 Dialer stopped for agent ${agent.name} (${agentId})`);
   }
+
 
   // ===== Dialer core =========================================================
-
-  private async replenish(agentId: string) {
-    const run = this.agentRunning[agentId];
-    if (!run) return;
-
-    while (run.active < run.slots) {
-      const got = await this.locks.acquire(`dialer:${agentId}`, 500);
-      if (!got) break;
-
-      try {
-        const agent = await this.prisma.agent.findUnique({ where: { id: agentId }, include: { systemCompany: true } });
-        if (!agent) break;
-
-        const lead = await this.leads.nextLead(agent.systemCompanyId);
-        if (!lead) break;
-
-        const callLog = await this.prisma.callLog.create({
-          data: {
-            callerId: lead.phone,
-            action: 'PREDICTIVE_DIAL',
-            direction: 'OUTBOUND',
-            status: 'WAITING',
-            systemName: agent.systemCompany.name,
-            userId: agentId,
-          },
-        });
-
-        const channel = this.ari.Channel();
-        channel.originate(
-          {
-            endpoint: `PJSIP/${lead.phone}`,
-            app: process.env.ARI_APP,
-            variables: {
-              CALLLOG_ID: callLog.id,
-              ROLE: 'customer',
-            },
-          },
-          (err) => {
-            if (err) this.logger.error('Originate failed', err.stack);
-          },
-        );
-
-        run.active++;
-        this.ws.emit('dialer:attempt', {
-          agentId,
-          leadId: lead.id,
-          name: agent.name,
-          systemCompanyId: agent.systemCompanyId,
-          callLogId: callLog.id,
-        });
-      } finally {
-        await this.locks.release(`dialer:${agentId}`);
-      }
+  private stopHoldTicker() {
+    if (this.holdTickTimer) {
+      clearInterval(this.holdTickTimer);
+      this.holdTickTimer = undefined;
+      this.logger.log(`⏹️ Stopped hold ticker (no held calls)`);
     }
   }
+  // private async replenish(agentId: string) {
+  //   const run = this.agentRunning[agentId];
+  //   if (!run) return;
+
+  //   while (run.active < run.slots) {
+  //     const got = await this.locks.acquire(`dialer:${agentId}`, 500);
+  //     if (!got) break;
+
+  //     try {
+  //       const agent = await this.prisma.agent.findUnique({ where: { id: agentId }, include: { systemCompany: true } });
+  //       if (!agent) break;
+
+  //       const lead = await this.leads.nextLead(agent.systemCompanyId);
+  //       if (!lead) break;
+
+  //       const callLog = await this.prisma.callLog.create({
+  //         data: {
+  //           callerId: lead.phone,
+  //           action: 'PREDICTIVE_DIAL',
+  //           direction: 'OUTBOUND',
+  //           status: 'WAITING',
+  //           systemName: agent.systemCompany.name,
+  //           userId: agentId,
+  //         },
+  //       });
+
+  //       const channel = this.ari.Channel();
+  //       channel.originate(
+  //         {
+  //           endpoint: `PJSIP/${lead.phone}`,
+  //           app: process.env.ARI_APP,
+  //           variables: {
+  //             CALLLOG_ID: callLog.id,
+  //             ROLE: 'customer',
+  //           },
+  //         },
+  //         async (err) => {
+  //           if (err) {
+  //             this.logger.error('Originate failed', err.stack);
+  //             await this.prisma.cRMLeads.update({
+  //               where: { id: lead.id },
+  //               data: { isContacted: true, contactStatus: 'FAILED' },
+  //             })
+  //           };
+  //         },
+  //       );
+
+  //       run.active++;
+  //       this.ws.emit('dialer:attempt', {
+  //         agentId,
+  //         leadId: lead.id,
+  //         name: agent.name,
+  //         systemCompanyId: agent.systemCompanyId,
+  //         callLogId: callLog.id,
+  //       });
+  //     } finally {
+  //       await this.locks.release(`dialer:${agentId}`);
+  //     }
+  //   }
+  // }
 
   // ===== Helpers =============================================================
 
@@ -187,7 +281,6 @@ export class DialerService extends EventEmitter implements OnModuleInit {
       });
       this.ws.emit('dialer:dropped', { callLogId, systemCompanyId: callLog.agent?.systemCompanyId, reason: 'timeout-no-agent' });
 
-      // hangup customer nicely
       try {
         const ch = this.ari.Channel(channelId);
         await this.safeStopMoh(ch);
@@ -205,52 +298,78 @@ export class DialerService extends EventEmitter implements OnModuleInit {
     }
   }
 
-  private startHoldTicker() {
-    if (this.holdTickTimer) return;
-    const tick = async () => {
-      try {
-        // any held customers? try to grab a free agent and bridge
-        const held = Object.entries(this.holdQueue); // [callLogId, customerChId]
-        if (!held.length) return;
+  // private startHoldTicker() {
+  //   if (this.holdTickTimer) return; // already running
 
-        const free = await this.agents.findFreeAgent();
-        if (!free) return;
+  //   const tick = async () => {
+  //     try {
+  //       const held = Object.entries(this.holdQueue); // [callLogId, customerChId]
+  //       if (!held.length) {
+  //         // No more held calls → stop ticker
+  //         this.stopHoldTicker();
+  //         return;
+  //       }
 
-        // pick oldest held customer
-        const [callLogId, customerChId] = held[0];
-        const agentEndpoint = await this.agents.getAgentEndpoint(free.id);
-        if (!agentEndpoint) return;
+  //       const free = await this.agents.findFreeAgent();
+  //       if (!free) return;
 
-        await this.agents.markStatus(free.id, 'RINGING');
+  //       // pick oldest held customer
+  //       const [callLogId, customerChId] = held[0];
+  //       const agentEndpoint = await this.agents.getAgentEndpoint(free.id);
+  //       const meta = this.channelToMeta[customerChId];
+  //       const customerPhone = meta?.phone;
+  //       if (!agentEndpoint) return;
+  //       this.logger.debug(customerPhone)
 
-        const agentCh = this.ari.Channel();
-        agentCh.originate({
-          endpoint: agentEndpoint,
-          app: process.env.ARI_APP,
-          appArgs: `ROLE=agent,CALLLOG_ID=${callLogId},AGENT_ID=${free.id}`,
-          variables: {
-            CALLLOG_ID: callLogId,
-            ROLE: 'agent',
-            AGENT_ID: free.id,
-            DYNAMIC_FEATURES: 'atxfer,blindxfer',
-          },
-        });
+  //       await this.agents.markStatus(free.id, 'RINGING');
 
-        this.logger.log(`🪄 Retried pairing held call ${callLogId} with agent ${free.id}`);
-      } catch (e) {
-        this.logger.warn(`hold-tick error: ${(e as Error).message}`);
-      }
-    };
+  //       const agentCh = this.ari.Channel();
 
-    this.holdTickTimer = setInterval(tick, 2000);
-  }
+  //       agentCh.originate({
+  //         endpoint: agentEndpoint,
+  //         app: process.env.ARI_APP,
+  //         appArgs: `ROLE=agent,CALLLOG_ID=${callLogId},AGENT_ID=${free.id}`,
+  //         callerId: customerPhone as string,
+  //         timeout: 30,
+  //         variables: {
+  //           CALLLOG_ID: callLogId,
+  //           ROLE: 'agent',
+  //           AGENT_ID: free.id,
+  //           DYNAMIC_FEATURES: 'atxfer,blindxfer',
+  //           "PJSIP_HEADER(add,X-CallLogId)": callLogId,
+  //           "PJSIP_HEADER(add,X-Role)": "agent",
+  //           "PJSIP_HEADER(add,X-AgentId)": free.id,
+  //           "PJSIP_HEADER(add,X-CUSTOMER_PHONE)": customerPhone
+  //         },
+  //       });
 
-  private async blastDial(systemcompanyId: number) {
-    const freeAgents = await this.agents.findAllFreeAgent(systemcompanyId);
+
+  //       this.logger.log(`🪄 Retried pairing held call ${callLogId} with agent ${free.id}`);
+  //     } catch (e) {
+  //       this.logger.warn(`hold-tick error: ${(e as Error).message}`);
+  //     }
+  //   };
+
+  //   this.logger.log(`▶️ Starting hold ticker`);
+  //   this.holdTickTimer = setInterval(tick, 2000);
+  // }
+
+
+
+
+  private async blastDial(systemCompanyId: number, agentId: string) {
+    // check if agent is still running
+    if (!this.agentRunning[agentId]) {
+      this.logger.warn(`⏹️ Agent ${agentId} not running anymore, stopping blast`);
+      return;
+    }
+
+    const freeAgents = await this.agents.findAllFreeAgent(systemCompanyId);
     const freeCount = freeAgents.length;
 
     if (freeCount === 0) {
-      this.logger.warn('❌ No free agents – stopping call attempts');
+      this.logger.warn("❌ No free agents – retrying in 5s");
+      setTimeout(() => this.blastDial(systemCompanyId, agentId), 5000);
       return;
     }
 
@@ -258,51 +377,90 @@ export class DialerService extends EventEmitter implements OnModuleInit {
     this.logger.log(`🚀 Blasting ${blast} calls for ${freeCount} free agents`);
 
     for (let i = 0; i < blast; i++) {
-      const lead = await this.leads.nextLead(systemcompanyId);
-      if (!lead) break;
+      const lead = await this.leads.nextLead(systemCompanyId);
+      if (!lead) {
+        this.logger.warn("📭 No more leads to call – retrying in 30s");
+        setTimeout(() => this.blastDial(systemCompanyId, agentId), 30000);
+        return;
+      }
 
       const callLog = await this.prisma.callLog.create({
         data: {
           callerId: lead.phone,
-          action: 'PREDICTIVE_DIAL',
-          direction: 'OUTBOUND',
-          status: 'WAITING',
-          systemName: 'predictive',
+          action: "PREDICTIVE_DIAL",
+          direction: "OUTBOUND",
+          status: "WAITING",
+          systemName: "predictive",
+          agentId,
         },
       });
 
       const ch = this.ari.Channel();
       try {
         const settings = await this.prisma.settings.findFirst({
-          where: {
-            systemCompanyId: systemcompanyId
-          },
-          include: {
-            sipProvider: true
-          }
+          where: { systemCompanyId },
+          include: { sipProvider: true, ivr: true },
         });
-        if (!settings) {
-          this.logger.warn(`No System Settings found for this company ID.Stopping The Process.`);
+
+        if (!settings?.sipProvider) {
+          this.logger.warn(`⚠️ No System Settings found. Retrying in 10s.`);
+          setTimeout(() => this.blastDial(systemCompanyId, agentId), 10000);
           return;
         }
+
         ch.originate(
           {
-            endpoint: `PJSIP/${lead.phone}@${settings?.sipProvider?.name}`,
+            // endpoint: `PJSIP/${lead.phone}@${settings.sipProvider.name}`,
+            endpoint: `PJSIP/${lead.phone}`,
+            callerId: settings?.ivr?.didNumber,
             app: process.env.ARI_APP,
+            timeout: 30,
             variables: {
               CALLLOG_ID: callLog.id,
-              ROLE: 'customer',
+              ROLE: "customer",
+              CUSTOMER_PHONE: lead.phone,
+              LEAD_ID: lead.id,
+              "PJSIP_HEADER(add,X-CallLogId)": callLog.id,
+              "PJSIP_HEADER(add,X-Role)": "customer",
+              "PJSIP_HEADER(add,X-CustomerPhone)": lead.phone,
+              "PJSIP_HEADER(add,X-LeadId)": lead.id,
             },
           },
-          (err) => {
-            if (err) this.logger.error(`Originate failed: ${err.message}`);
-          },
+          async (err) => {
+            if (err) {
+              this.logger.error(`Originate failed: ${err.message}`);
+              await this.prisma.callLog.update({
+                where: { id: callLog.id },
+                data: { status: $Enums.CallStatus.INTERNAL_ERROR, agentId },
+              });
+              await this.prisma.cRMLeads.update({
+                where: { id: lead.id },
+                data: { contactStatus: $Enums.CallStatus.INTERNAL_ERROR },
+              });
+            }
+          }
         );
+
+        this.channelToMeta[ch.id] = {
+          callLogId: callLog.id,
+          role: "customer",
+          agentId,
+          phone: lead.phone,
+          leadId: lead.id,
+        };
       } catch (e) {
         this.logger.error(`Originate failed: ${(e as Error).message}`);
       }
     }
+
+
+    this.agentTimers[agentId] = setTimeout(
+      () => this.blastDial(systemCompanyId, agentId),
+      5000
+    );
+
   }
+
 
   private findCustomerChannel(callLogId: string): string | undefined {
     return Object.entries(this.channelToMeta).find(
@@ -312,12 +470,11 @@ export class DialerService extends EventEmitter implements OnModuleInit {
 
   // ===== ARI Event Handlers ==================================================
 
-  private async onStasisStart(ev: any, ch: any) {
-    // Gather vars (ARI can deliver in different places)
-    const vars: Record<string, string> = {
-      ...(ch.channelvars || {}),
-      ...(ch.variables || {}),
-    };
+
+
+  // 🌸 Handle Stasis start
+  private async onStasisStart(ev: any, ch: Channel) {
+    const vars: Record<string, string> = { ...(ch.channelvars || {}) };
     if (Array.isArray(ev?.args)) {
       for (const arg of ev.args) {
         const [k, v] = String(arg).split('=');
@@ -330,53 +487,85 @@ export class DialerService extends EventEmitter implements OnModuleInit {
       (vars.ROLE?.toLowerCase() as any) === 'agent' ? 'agent' : 'customer';
     const agentId: string | null = vars.AGENT_ID ?? null;
 
-    if (!callLogId) {
+    // Create new callLog if customer leg starts without one
+    if (!callLogId && role === 'customer') {
       const newLog = await this.prisma.callLog.create({
         data: {
           callerId: ch.caller?.number || ch.name,
           action: 'PREDICTIVE_DIAL',
-          direction: role === 'customer' ? 'INBOUND' : 'OUTBOUND',
+          direction: 'OUTBOUND',
           status: $Enums.CallStatus.RINGING,
           systemName: 'predictive',
+          agentId: agentId,
         },
       });
       callLogId = newLog.id;
-      this.logger.log(`📝 Created new callLog ${callLogId} for channel ${ch.id}`);
+      this.logger.log(`📝 Created new callLog ${callLogId} for customer channel ${ch.id}`);
     }
 
-    this.channelToMeta[ch.id] = { callLogId, role, agentId };
+    // If agent leg has no callLogId, try to link to customer
+    if (!callLogId && role === 'agent') {
+      const custEntry = Object.entries(this.channelToMeta)
+        .find(([_, m]) => m.role === 'customer');
+      if (custEntry) {
+        callLogId = custEntry[1].callLogId;
+        this.logger.log(`🔗 Agent channel ${ch.id} linked to customer callLog ${callLogId}`);
+      }
+    }
+
+    // Save/merge channel meta (preserve agentId from pre-registration)
+    // this.channelToMeta[ch.id] = {
+    //   callLogId,
+    //   role,
+    //   agentId: agentId ?? this.channelToMeta[ch.id]?.agentId ?? null,
+    //   phone: vars.CUSTOMER_PHONE || ch.caller?.number,
+    // };
     this.emit(`meta:ready:${ch.id}`);
-    const callLog = await this.prisma.callLog.update({
-      where: { id: callLogId },
-      data: { status: $Enums.CallStatus.RINGING },
-      include: { agent: true }
-    });
 
-    if (!callLog) this.logger.warn(`No agent found for callLog ${callLogId}`);
+    // Update callLog status if exists
+    if (callLogId) {
+      try {
+        const callLog = await this.prisma.callLog.update({
+          where: { id: callLogId },
+          data: { status: $Enums.CallStatus.RINGING },
+          include: { agent: true },
+        });
 
-    // customer enters on-hold immediately (audible feedback while we look for agent)
-    if (role === 'customer') {
+        if (!callLog.agent && role === 'agent') {
+          this.logger.warn(`⚠️ No agent linked in callLog ${callLogId}`);
+        }
+      } catch (e) {
+        this.logger.warn(`⚠️ Could not update callLog ${callLogId}: ${(e as Error).message}`);
+      }
+    }
+
+    // Customer-specific handling
+    if (role === 'customer' && callLogId) {
       try {
         await ch.startMoh();
       } catch (e) {
         this.logger.warn(`Could not start MOH on ${ch.id}: ${(e as Error).message}`);
       }
-      // queue for hold-ticker pairing
       this.holdQueue[callLogId] = ch.id;
       this.setHoldTimeout(ch.id, callLogId);
-      this.ws.emit('dialer:ringing', { callLogId, systemCompanyId: callLog.agent?.systemCompanyId, channelId: ch.id });
+      this.ws.emit('dialer:ringing', {
+        callLogId,
+        systemCompanyId: (await this.prisma.callLog.findUnique({
+          where: { id: callLogId },
+          include: { agent: true },
+        }))?.agent?.systemCompanyId,
+        channelId: ch.id,
+      });
     }
-
-
   }
 
+  // 🌸 Handle channel state changes
   private async onChannelStateChange(ev: any, ch: Channel) {
     this.logger.debug({ channelId: ch.id, state: ch.state }, '📞 [STATE CHANGE]');
     if (ch.state !== 'Up') return;
 
     let meta = this.channelToMeta[ch.id];
     if (!meta) {
-      // race protect
       this.logger.warn(`⚠️ No meta yet for ${ch.id}, queuing state change...`);
       this.once(`meta:ready:${ch.id}`, () => {
         this.logger.log(`🔄 Re-running state change for ${ch.id} after meta ready`);
@@ -389,36 +578,71 @@ export class DialerService extends EventEmitter implements OnModuleInit {
       const free = await this.agents.findFreeAgent();
       this.logger.debug({ freeAgent: free }, '👀 [AGENT SEARCH]');
       if (!free) {
-        // remain on MOH; hold-ticker will retry later
+        this.logger.warn(`⚠️ No free agents → keeping customer ${ch.id} on hold`);
         this.holdQueue[meta.callLogId] = ch.id;
         return;
       }
 
+      // Mark agent RINGING
       await this.agents.markStatus(free.id, 'RINGING');
+
+      // 💡 LINK agentId to customer meta *immediately*
+      meta.agentId = free.id;
+      this.channelToMeta[ch.id] = meta;
+
+      // Also update callLog with agentId immediately
+      await this.prisma.callLog.update({
+        where: { id: meta.callLogId },
+        data: { agentId: free.id },
+      });
+
       const agentEndpoint = await this.agents.getAgentEndpoint(free.id);
-      if (!agentEndpoint) return;
+      const customerPhone = meta?.phone;
+      if (!agentEndpoint) {
+        this.logger.error(`❌ No endpoint for agent ${free.id}, aborting originate`);
+        return;
+      }
+
+      this.logger.debug(`📡 Originate agent for callLog ${meta.callLogId}`, {
+        agent: free.id,
+        endpoint: agentEndpoint,
+        customerPhone,
+      });
 
       const agentCh = this.ari.Channel();
+      const agentChannelId = agentCh.id;
+      this.channelToMeta[agentChannelId] = {
+        callLogId: meta.callLogId,
+        role: 'agent',
+        agentId: free.id,
+        phone: free.phoneNumber,
+      };
+
       agentCh.originate({
         endpoint: agentEndpoint,
         app: process.env.ARI_APP,
+        callerId: customerPhone as string,
         appArgs: `ROLE=agent,CALLLOG_ID=${meta.callLogId},AGENT_ID=${free.id}`,
         variables: {
           CALLLOG_ID: meta.callLogId,
           ROLE: 'agent',
           AGENT_ID: free.id,
           DYNAMIC_FEATURES: 'atxfer,blindxfer',
+          "PJSIP_HEADER(add,X-Role)": "agent",
+          "PJSIP_HEADER(add,X-AgentId)": free.id,
+          "PJSIP_HEADER(add,X-CUSTOMER_PHONE)": customerPhone,
+          "PJSIP_HEADER(add,X-LeadId)": meta.leadId,
         },
       });
     } else if (meta.role === 'agent') {
-      // agent answered → bridge with customer
+      // Bridge with customer
       const customerChId = this.findCustomerChannel(meta.callLogId);
       if (!customerChId) {
-        this.logger.error(`❌ No customer channel found for callLog ${meta.callLogId}`);
+        this.logger.error(`❌ No customer channel found for callLog ${meta.callLogId}, hanging up agent...`);
+        try { await ch.hangup(); } catch { }
         return;
       }
 
-      // stop MOH before bridging
       try {
         await this.safeStopMoh(this.ari.Channel(customerChId));
       } catch { }
@@ -427,18 +651,16 @@ export class DialerService extends EventEmitter implements OnModuleInit {
       await bridge.create({ type: 'mixing' });
       await bridge.addChannel({ channel: [customerChId, ch.id] });
 
-      // remove from hold queue if present
       delete this.holdQueue[meta.callLogId];
       this.clearHoldTimeout(customerChId);
 
       const callLog = await this.prisma.callLog.update({
         where: { id: meta.callLogId },
         data: { status: $Enums.CallStatus.CONNECTED, agentId: meta.agentId },
-        include: { agent: true }
+        include: { agent: true },
       });
       if (meta.agentId) await this.agents.markStatus(meta.agentId, 'BUSY');
 
-      // enable dynamic features for both legs (optional)
       try {
         await this.ari.Channel(customerChId).setChannelVar({
           variable: 'DYNAMIC_FEATURES',
@@ -450,83 +672,158 @@ export class DialerService extends EventEmitter implements OnModuleInit {
         });
       } catch { }
 
-      this.ws.emit('dialer:bridged', { callLogId: meta.callLogId, phoneNumber: callLog.calleeId, systemCompanyId: callLog.agent?.systemCompanyId, agentId: meta.agentId });
-      const vars: Record<string, string> = {
-        ...(ch.channelvars || {}),
-      };
-      if (Array.isArray(ev?.args)) {
-        for (const arg of ev.args) {
-          const [k, v] = String(arg).split('=');
-          if (k && v != null) vars[k] = v;
-        }
-      }
-      let callLogId: string | null = vars.CALLLOG_ID ?? null;
-      try {
-        await this.prisma.callLog.update({
-          where: { id: callLogId },
-          data: { status: $Enums.CallStatus.CONNECTED, agentId: meta.agentId },
-        });
-        this.logger.log(`✔️ Updating Call Log as status CONNECTED`, { callLogId: meta.callLogId });
-      } catch (e) {
-        this.logger.error(`❌ Error updating Call Log`, { callLogId: meta.callLogId });
+      this.ws.emit('dialer:bridged', {
+        callLogId: meta.callLogId,
+        phoneNumber: callLog.calleeId,
+        systemCompanyId: callLog.agent?.systemCompanyId,
+        agentId: meta.agentId,
+      });
 
-      }
       this.logger.log('✅ Call bridged successfully', { callLogId: meta.callLogId });
     }
   }
 
-  private async onChannelDestroyed(ev: any, ch: Channel) {
-    const meta = this.channelToMeta[ch.id];
-    if (!meta) return;
 
+
+
+
+
+  private async onChannelDestroyed(ev: any, ch: Channel) {
+    this.logger.debug("🗑️ Channel destroyed bye", { channelId: ch.id, state: ch.state });
+
+    const meta = this.channelToMeta[ch.id];
+    if (!meta) {
+      this.logger.debug(`⚠️ No meta found for destroyed channel ${ch.id}`);
+      return;
+    }
+
+    this.logger.debug("🔎 Destroy meta", meta);
     this.clearHoldTimeout(ch.id);
 
-    // clean transfer state if any
-    if (meta.callLogId) this.pendingTransfers.delete(meta.callLogId);
+    if (meta.callLogId) {
+      this.logger.debug(`🧹 Cleaning pending transfer for callLog ${meta.callLogId}`);
+      this.pendingTransfers.delete(meta.callLogId);
+    }
 
-    // if customer hung up while ringing → mark no answer
     try {
-      const cl = await this.prisma.callLog.findUnique({ where: { id: meta.callLogId } });
-      if (cl && cl.status === $Enums.CallStatus.RINGING) {
-        await this.prisma.callLog.update({
-          where: { id: cl.id },
-          data: { status: $Enums.CallStatus.NO_ANSWER },
-        });
-      }
-    } catch { }
+      const cl = meta.callLogId
+        ? await this.prisma.callLog.findUnique({ where: { id: meta.callLogId } })
+        : null;
 
+      this.logger.debug("📒 CallLog before update", cl);
+
+      if (cl) {
+
+        let finalStatus: $Enums.CallStatus | null = null;
+        let newContactStatus: string | null = null;
+
+        if (cl.status === $Enums.CallStatus.RINGING) {
+          // lead never picked up
+          await this.prisma.callLog.update({
+            where: { id: cl.id },
+            data: { status: $Enums.CallStatus.NO_ANSWER, agentId: meta.agentId },
+          });
+          finalStatus = $Enums.CallStatus.NO_ANSWER;
+          newContactStatus = "No Answer";
+        }
+        else if (cl.status === $Enums.CallStatus.CONNECTED) {
+          // lead DID answer at some point, then hung up
+          await this.prisma.callLog.update({
+            where: { id: cl.id },
+            data: { status: $Enums.CallStatus.HUNGUP, agentId: meta.agentId },
+          });
+          finalStatus = $Enums.CallStatus.HUNGUP;
+          newContactStatus = "Answered";
+        }
+        else if (cl.status === $Enums.CallStatus.BUSY) {
+          await this.prisma.callLog.update({
+            where: { id: cl.id },
+            data: { status: $Enums.CallStatus.BUSY, agentId: meta.agentId },
+          });
+          finalStatus = $Enums.CallStatus.BUSY;
+          newContactStatus = "Busy";
+        }
+        else if (cl.status === $Enums.CallStatus.FAILED) {
+          await this.prisma.callLog.update({
+            where: { id: cl.id },
+            data: { status: $Enums.CallStatus.FAILED, agentId: meta.agentId },
+          });
+          finalStatus = $Enums.CallStatus.FAILED;
+          newContactStatus = "Failed";
+        }
+        else {
+          // fallback
+          await this.prisma.callLog.update({
+            where: { id: cl.id },
+            data: { status: $Enums.CallStatus.NO_ANSWER, agentId: meta.agentId },
+          });
+          finalStatus = $Enums.CallStatus.NO_ANSWER;
+          newContactStatus = "No Answer";
+        }
+
+        if (meta.leadId && newContactStatus) {
+          await this.prisma.cRMLeads.update({
+            where: { id: meta.leadId },
+            data: {
+              contactStatus: newContactStatus,
+              isContacted: true,
+            },
+          });
+
+          this.logger.log(
+            `💾 Lead ${meta.leadId} (${meta.phone}) → contactStatus=${newContactStatus}`
+          );
+        }
+      }
+    } catch (e) {
+      this.logger.error(
+        `❌ Error updating Call Log/Lead ${meta.callLogId}: ${(e as Error).message}`
+      );
+    }
+    // Handle paired legs (only if still alive in channelToMeta)
     if (meta.role === 'customer' && meta.callLogId) {
-      // Customer hung up → kill the agent leg too
+      this.logger.debug(`👤 Customer leg ${ch.id} destroyed → checking for paired agent...`);
       const agentEntry = Object.entries(this.channelToMeta)
         .find(([_, m]) => m.role === 'agent' && m.callLogId === meta.callLogId);
 
       if (agentEntry) {
         const [agentChId, agentMeta] = agentEntry;
+        this.logger.debug(`Found agent leg ${agentChId}`, agentMeta);
+
         try {
-          await this.ari.channels.hangup({ channelId: agentChId });
-          this.logger.log(`Hung up agent ${agentChId} because customer left`);
+          await this.ari.Channel(agentChId).hangup();
+          this.logger.log(`💔 Hung up agent ${agentChId} because customer ${ch.id} left`);
         } catch (e) {
-          this.logger.warn(`Could not hangup agent channel: ${e.message}`);
+          this.logger.warn(`Could not hangup agent channel ${agentChId}: ${(e as Error).message}`);
         }
       }
     }
 
     if (meta.role === 'agent' && meta.callLogId) {
-      // Agent hung up → kill the customer leg too
+      this.logger.debug(`🤖 Agent leg ${ch.id} destroyed → checking for paired customer...`);
       const custEntry = Object.entries(this.channelToMeta)
         .find(([_, m]) => m.role === 'customer' && m.callLogId === meta.callLogId);
 
       if (custEntry) {
         const [custChId, custMeta] = custEntry;
+        this.logger.debug(`Found customer leg ${custChId}`, custMeta);
+
         try {
-          await this.ari.channels.hangup({ channelId: custChId });
-          this.logger.log(`Hung up customer ${custChId} because agent left`);
+          await this.ari.Channel(custChId).hangup();
+          this.logger.log(`💔 Hung up customer ${custChId} because agent ${ch.id} left`);
         } catch (e) {
-          this.logger.warn(`Could not hangup customer channel: ${e.message}`);
+          this.logger.warn(`Could not hangup customer channel ${custChId}: ${(e as Error).message}`);
         }
       }
     }
-    delete this.holdQueue[meta.callLogId];
+
+    // Cleanup
+    if (meta.callLogId) {
+      this.logger.debug(`🧹 Cleaning holdQueue for callLog ${meta.callLogId}`);
+      delete this.holdQueue[meta.callLogId];
+    }
+
+    this.logger.debug(`🧹 Removing channel meta for ${ch.id}`);
     delete this.channelToMeta[ch.id];
   }
 

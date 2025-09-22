@@ -34,9 +34,40 @@ export class AgentService {
   }
 
 
-  async findAllFreeAgent(systemCompanyId?: number) {
-    return this.prisma.agent.findMany({ where: { status: 'AVAILABLE', ...(systemCompanyId ? { systemCompanyId } : {}) } });
+
+
+
+  async findAllFreeAgent(systemCompanyId?: number): Promise<Agent[]> {
+    const agents = await this.prisma.agent.findMany({
+      where: {
+        status: 'AVAILABLE',
+        ...(systemCompanyId ? { systemCompanyId } : {}),
+      },
+    });
+
+    return new Promise((resolve) => {
+      const available: any[] = [];
+
+      const onEvent = (event) => {
+        if (event.event === 'EndpointList') {
+          const agent = agents.find(a => a.sipUname === event.objectname);
+          if (agent && event.devicestate === 'Not in use') {
+            available.push(agent);
+          }
+        }
+
+        if (event.event === 'EndpointListComplete') {
+          this.amiService.removeListener('managerevent', onEvent);
+          resolve(available);
+        }
+      };
+
+      this.amiService.on('managerevent', onEvent);
+      this.amiService.action({ Action: 'PJSIPShowEndpoints' });
+    });
   }
+
+
 
 
   async getAgentEndpoint(agentId: string) {
@@ -95,6 +126,18 @@ export class AgentService {
         systemCompanyId: data.systemCompanyId,
       },
     });
+
+
+
+    const agentInformation = await this.prisma.agentInformation.create({
+      data: {
+        Agent: {
+          connect: { id: agent.id },
+        },
+      },
+    })
+
+
 
     // 🍥 Store PJSIP settings separately
     if (data.SIPTech === 'PJSIP') {

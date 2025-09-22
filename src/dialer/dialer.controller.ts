@@ -1,7 +1,8 @@
-import { Body, Controller, Param, Post } from '@nestjs/common';
+import { Body, Controller, Get, Param, Post } from '@nestjs/common';
 import { StartDialDto } from './dto/start-dial.dto';
 import { StopDialDto } from './dto/stop-dial.dto';
 import { DialerService } from './dialer.service';
+import { AgentInformation } from '@prisma/client';
 
 
 @Controller('dialer')
@@ -18,5 +19,10 @@ export class DialerController {
   @Post('agent/:agentId/stop')
   async stop(@Param('agentId') agentId: string, @Body() dto: StopDialDto) {
     return this.dialer.stopAgentDial(agentId, dto.reason ?? 'user');
+  }
+
+  @Get("agent/:agentId/metaData")
+  async getMetadata(@Param("agentId") agentId: string): Promise<AgentInformation | null> {
+    return this.dialer.getAgentMetadata(agentId);
   }
 }

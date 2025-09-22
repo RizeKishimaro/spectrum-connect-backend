@@ -8,20 +8,22 @@ datasource db {
 }
 
 model CallLog {
-  id         String        @id @default(cuid())
-  callerId   String
-  action     String?
-  createdAt  DateTime      @default(now())
-  agentId    String?
-  calleeId   String?
-  direction  CallDirection
-  duration   Int?
-  hungUpBy   String?
-  status     CallStatus
-  systemName String
-  updatedAt  DateTime      @updatedAt
-  userId     String?
-  agent      Agent?        @relation(fields: [agentId], references: [id])
+  id          String        @id @default(cuid())
+  callerId    String
+  action      String?
+  createdAt   DateTime      @default(now())
+  agentId     String?
+  calleeId    String?
+  direction   CallDirection
+  duration    Int?
+  ringTime    Int?
+  connectedAt DateTime?
+  hungUpBy    String?
+  status      CallStatus
+  systemName  String
+  updatedAt   DateTime      @updatedAt
+  userId      String?
+  agent       Agent?        @relation(fields: [agentId], references: [id])
 }
 
 model User {
@@ -74,24 +76,25 @@ model Subscription {
 }
 
 model Agent {
-  id               String            @id @default(cuid())
+  id               String             @id @default(cuid())
   name             String
-  status           AgentStatus       @default(AVAILABLE)
-  updatedAt        DateTime          @updatedAt
+  status           AgentStatus        @default(AVAILABLE)
+  updatedAt        DateTime           @updatedAt
   firstName        String
   lastName         String
   phoneNumber      String
   sipPassword      String
-  sipUname         String            @unique
+  sipUname         String             @unique
   systemCompanyId  Int
   password         String
   profilePicture   String?
-  createdAt        DateTime          @default(now())
-  sipTech          String            @default("pjsip") @map("SipTech")
-  systemCompany    SystemCompany     @relation(fields: [systemCompanyId], references: [id])
+  createdAt        DateTime           @default(now())
+  sipTech          String             @default("pjsip") @map("SipTech")
+  systemCompany    SystemCompany      @relation(fields: [systemCompanyId], references: [id])
   AgentPJSIPConfig AgentPJSIPConfig?
   CallLog          CallLog[]
   ParkedCall       ParkedCall[]
+  AgentInformation AgentInformation[]
 }
 
 model AgentPJSIPConfig {
@@ -272,6 +275,7 @@ model CRMLeads {
   companyCount  String?
   services      Services[]
   isContacted   Boolean    @default(false)
+  locked        Boolean    @default(false)
   contactStatus String?
   description   String?
   address       String?
@@ -326,13 +330,23 @@ model Services {
 }
 
 model SIPEndpoints {
-  id        String     @id @default(cuid())
-  createdAt DateTime   @default(now())
-  updatedAt DateTime   @updatedAt
-  name      String
-  ipHost    String     @default("0.0.0.0")
-  sipTech   String     @default("pjsip")
-  settings  Settings[]
+  id         String       @id @default(cuid())
+  createdAt  DateTime     @default(now())
+  updatedAt  DateTime     @updatedAt
+  name       String
+  ipHost     String       @default("0.0.0.0")
+  sipTech    String       @default("pjsip")
+  settings   Settings[]
+  DIDNumbers DIDNumbers[]
+}
+
+model DIDNumbers {
+  id             String        @id @default(cuid())
+  didNumber      String
+  createdAt      DateTime      @default(now())
+  updatedAt      DateTime      @updatedAt
+  SIPEndpoints   SIPEndpoints? @relation(fields: [sIPEndpointsId], references: [id])
+  sIPEndpointsId String?
 }
 
 model Extensions {
@@ -340,7 +354,17 @@ model Extensions {
   createdAt DateTime   @default(now())
   updatedAt DateTime   @updatedAt
   name      String
+  didNumber String     @default("")
   settings  Settings[]
+}
+
+model AgentInformation {
+  id                   String   @id @default(cuid())
+  isInPredictiveDialer Boolean  @default(false)
+  Agent                Agent    @relation(fields: [agentId], references: [id])
+  createdAt            DateTime @default(now())
+  updatedAt            DateTime @updatedAt
+  agentId              String
 }
 
 model Settings {

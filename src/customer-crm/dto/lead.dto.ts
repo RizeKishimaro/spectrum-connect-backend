@@ -1,5 +1,6 @@
 
-import { IsArray, IsBoolean, IsEmail, IsOptional, IsString } from 'class-validator';
+import { Type } from 'class-transformer';
+import { IsArray, IsBoolean, IsEmail, IsOptional, IsString, ValidateNested } from 'class-validator';
 
 export class CreateLeadDto {
   @IsEmail() email!: string;
@@ -32,3 +33,9 @@ export class UpdateLeadDto {
   @IsOptional() @IsString() address?: string;
 }
 
+export class CreateLeadsDto {
+  @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => CreateLeadDto)
+  leads!: CreateLeadDto[]
+}
