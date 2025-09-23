@@ -33,10 +33,6 @@ export class AgentService {
     return this.prisma.agent.findFirst({ where: { status: 'AVAILABLE', ...(systemCompanyId ? { systemCompanyId } : {}) } });
   }
 
-
-
-
-
   async findAllFreeAgent(systemCompanyId?: number): Promise<Agent[]> {
     const agents = await this.prisma.agent.findMany({
       where: {

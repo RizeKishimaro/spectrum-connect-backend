@@ -18,11 +18,9 @@ export class UserService {
   async login(dto: LoginDto) {
     const user = await this.prisma.user.findFirst({ where: { email: dto.email }, include: { subscription: true } });
 
-    console.log(user)
     if (!user) throw new BadRequestException('Invalid credentials');
     const valid = await bcrypt.compare(dto.password, user.password);
 
-    console.log(valid)
     if (!valid) throw new BadRequestException('Invalid credentials');
 
     const token = this.jwt.sign({ sub: user.id, user: user }, { secret: process.env.JWT_SECRET, expiresIn: "7d" });
