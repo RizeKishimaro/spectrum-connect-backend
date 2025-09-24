@@ -52,7 +52,7 @@ import { DialerModule } from './dialer/dialer.module';
     SystemManagerModule,
     ParkedCallModule,
     SubscriptionsModule,
-    SmsModule,
+    // SmsModule,
     CrmModule,
     AppointmentModule,
     WsGatewayModule,
