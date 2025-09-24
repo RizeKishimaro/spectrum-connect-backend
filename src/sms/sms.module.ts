@@ -5,7 +5,6 @@ import { SmsController } from './sms.controller'
 import { SmsProcessor } from './processors/sms.processor'
 import { CommpeakProcessor } from './processors/commpeak.processor'
 import { TopyingProcessor } from './processors/topying.processor'
-import { SMPPSmsConsumer } from './processors/smpp.processor'
 
 @Module({
   imports: [
@@ -18,12 +17,9 @@ import { SMPPSmsConsumer } from './processors/smpp.processor'
     BullModule.registerQueue({
       name: "topying"
     }),
-    BullModule.registerQueue({
-      name: "smpp-sms"
-    })
   ],
   controllers: [SmsController],
-  providers: [SmsService, SmsProcessor, CommpeakProcessor, TopyingProcessor, SMPPSmsConsumer],
+  providers: [SmsService, SmsProcessor, CommpeakProcessor, TopyingProcessor],
 })
 export class SmsModule { }
 
