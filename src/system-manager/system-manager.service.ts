@@ -689,7 +689,7 @@ export class SystemManagerService {
     const settings = await this.prismaService.settings.findFirst({
       where: { systemCompanyId },
     });
-    console.log(settingsDto)
+    console.log(settingsDto, systemCompanyId)
 
     if (settings) {
       const updatedSettings = await this.prismaService.settings.update({

@@ -440,8 +440,8 @@ export class DialerService extends EventEmitter implements OnModuleInit {
 
         ch.originate(
           {
-            // endpoint: `PJSIP/${lead.phone}@${settings.sipProvider.name}`,
-            endpoint: `PJSIP/${lead.phone}`,
+            endpoint: `PJSIP/${lead.phone}@${settings.sipProvider.name}`,
+            // endpoint: `PJSIP/${lead.phone}`,
             callerId: settings.DIDNumber?.didNumber,
             app: process.env.ARI_APP,
             timeout: 30,
