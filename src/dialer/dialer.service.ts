@@ -75,6 +75,19 @@ export class DialerService extends EventEmitter implements OnModuleInit {
   async startAgentDial(agentId: string, dto: { slots?: number }) {
     const agent = await this.prisma.agent.findUnique({ where: { id: agentId } });
     if (!agent) throw new BadRequestException("Invalid Agent Detected By System!")
+    const settings = await this.prisma.settings.findFirst({
+      where: {
+        systemCompanyId: agent.systemCompanyId
+      },
+      include: {
+        sipProvider: true,
+        ivr: true,
+        DIDNumber: true
+      }
+    })
+    if (!settings?.sipProvider || !settings?.ivr || !settings.DIDNumber) {
+      throw new BadRequestException("Missing System Settings Please Tell Your Administrator!")
+    }
     const agentInformation = await this.prisma.agentInformation.findFirst({
       where: {
         agentId: agent.id
@@ -139,6 +152,19 @@ export class DialerService extends EventEmitter implements OnModuleInit {
     const agent = await this.prisma.agent.findUnique({ where: { id: agentId } });
 
     if (!agent) throw new BadRequestException('Agent not found');
+    const settings = await this.prisma.settings.findFirst({
+      where: {
+        systemCompanyId: agent.systemCompanyId
+      },
+      include: {
+        sipProvider: true,
+        ivr: true,
+        DIDNumber: true
+      }
+    })
+    if (!settings?.sipProvider || !settings?.ivr || !settings.DIDNumber) {
+      throw new BadRequestException("Missing System Settings Please Tell Your Administrator!")
+    }
     const agentInformation = await this.prisma.agentInformation.findFirst({
       where: {
         agentId: agent.id
