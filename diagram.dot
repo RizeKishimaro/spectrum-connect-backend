@@ -1,0 +1,53 @@
+digraph NestModules {
+    rankdir=LR;
+    node [shape=box, style=filled, color=lightblue];
+
+    AppModule -> ConfigModule;
+    AppModule -> BullModule;
+    AppModule -> AmiModule;
+    AppModule -> ScheduleModule;
+    AppModule -> CallModule;
+    AppModule -> UserModule;
+    AppModule -> AuthModule;
+    AppModule -> PrismaModule;
+    AppModule -> PaginationModule;
+    AppModule -> JwtModule;
+    AppModule -> CallLogModule;
+    AppModule -> SipProviderModule;
+    AppModule -> SystemCompanyModule;
+    AppModule -> RtpAddressModule;
+    AppModule -> SystemManagerModule;
+    AppModule -> ParkedCallModule;
+    AppModule -> SubscriptionsModule;
+    AppModule -> CrmModule;
+    AppModule -> AppointmentModule;
+    AppModule -> WsGatewayModule;
+    AppModule -> CustomerCrmModule;
+    AppModule -> DialerModule;
+
+    SystemManagerModule -> ParkedCallModule;
+    SystemManagerModule -> AgentModule;
+    AgentModule -> SystemManagerModule;
+
+    DialerModule -> ARI_CLIENT;
+    DialerModule -> AgentService;
+    DialerModule -> CustomerCrmService;
+    DialerModule -> LockService;
+    DialerModule -> PrismaService;
+    DialerModule -> SystemCompanyService;
+    DialerModule -> SystemManagerService;
+    DialerModule -> ParkedCallService;
+    DialerModule -> WsGatewayGateway;
+
+    CallModule -> PrismaService;
+    CallLogModule -> PrismaService;
+    SipProviderModule -> PrismaService;
+    AppointmentModule -> PrismaService;
+    RtpAddressModule -> PrismaService;
+    ParkedCallModule -> PrismaService;
+    SystemCompanyModule -> PrismaService;
+
+    AuthModule -> PjsipService;
+    AuthModule -> JwtService;
+}
+

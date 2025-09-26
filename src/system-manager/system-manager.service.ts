@@ -15,6 +15,9 @@ import { UpdateExtensionDto } from './dto/update-extension.dto';
 import { CreateExtensionDto } from './dto/create-extension.dto';
 import { PrismaService } from 'src/utils/prisma/prisma.service';
 import { UserSettingsDto } from './dto/user-settings.dto';
+import { ExpressRequest } from 'src/types/other';
+import { CreateDIDNumberDTO } from './dto/create-didnumber.dto';
+import { UpdateDIDNumberDTO } from './dto/update-didnumber.dto';
 
 const exec = promisify(execCb)
 
@@ -560,12 +563,21 @@ export class SystemManagerService {
     }
   }
 
+
   async create(dto: CreateSipEndpointDto) {
     return this.prismaService.sIPEndpoints.create({
       data: {
         name: dto.name,
         ipHost: dto.ipHost ?? '0.0.0.0',
         sipTech: dto.sipTech ?? 'pjsip',
+        DIDNumbers: dto.didIds
+          ? {
+            connect: dto.didIds.map((id) => ({ id })),
+          }
+          : undefined,
+      },
+      include: {
+        DIDNumbers: true,
       },
     });
   }
@@ -582,7 +594,7 @@ export class SystemManagerService {
         }
         : undefined,
       orderBy: { createdAt: 'desc' },
-      include: { settings: true },
+      include: { settings: true, DIDNumbers: true },
     });
   }
 
@@ -595,17 +607,33 @@ export class SystemManagerService {
     return item;
   }
 
+
+
+
   async update(id: string, dto: UpdateSipEndpointDto) {
     await this.ensureExists(id);
+
     return this.prismaService.sIPEndpoints.update({
       where: { id },
       data: {
         name: dto.name,
-        ipHost: dto.ipHost,
-        sipTech: dto.sipTech,
+        ipHost: dto.ipHost ?? "0.0.0.0",
+        sipTech: dto.sipTech ?? "pjsip",
+
+        // only handle DID numbers
+        DIDNumbers: dto.didIds
+          ? {
+            set: dto.didIds.map((didId) => ({ id: didId })),
+          }
+          : undefined,
+      },
+      include: {
+        DIDNumbers: true,
       },
     });
   }
+
+
 
   async remove(id: string) {
     await this.ensureExists(id);
@@ -656,28 +684,37 @@ export class SystemManagerService {
     if (!hit) throw new NotFoundException('Extension not found');
   }
 
+
   async saveUserSettings(settingsDto: UserSettingsDto, systemCompanyId: number) {
     const settings = await this.prismaService.settings.findFirst({
-      where: { systemCompanyId }
+      where: { systemCompanyId },
     });
-    console.log(settings)
+    console.log(settingsDto)
+
     if (settings) {
       const updatedSettings = await this.prismaService.settings.update({
         where: { id: settings.id },
         data: {
-          ...settings,
-          ...settingsDto
-        }
-      })
+          blastCount: settingsDto.blastCount,
+          callLimit: settingsDto.callLimit,
+          sipProviderId: settingsDto.sipProviderId,
+          ivrId: settingsDto.ivrId,
+          dIDNumberId: settingsDto.didNumberId ?? null,
+        },
+      });
       return updatedSettings;
     } else {
-      const updatedSettings = await this.prismaService.settings.create({
+      const createdSettings = await this.prismaService.settings.create({
         data: {
-          ...settingsDto,
-          systemCompanyId
-        }
-      })
-      return updatedSettings;
+          systemCompanyId,
+          blastCount: settingsDto.blastCount,
+          callLimit: settingsDto.callLimit,
+          sipProviderId: settingsDto.sipProviderId,
+          ivrId: settingsDto.ivrId,
+          dIDNumberId: settingsDto.didNumberId ?? null,
+        },
+      });
+      return createdSettings;
     }
   }
   async getUserSettings(systemCompanyId: number) {
@@ -686,4 +723,45 @@ export class SystemManagerService {
     });
     return settings;
   }
+
+  async getEndpointDIDInformation(endpointId: string) {
+    const didNumbers = await this.prismaService.dIDNumbers.findMany({
+      where: { sIPEndpointsId: endpointId }
+    });
+
+    return didNumbers;
+  }
+
+  async getAllDIDNumber() {
+    const didNumbers = await this.prismaService.dIDNumbers.findMany({
+      include: {
+        SIPEndpoints: true
+      }
+    });
+    return didNumbers;
+  }
+
+  async createDIDNumber(dto: CreateDIDNumberDTO) {
+    return this.prismaService.dIDNumbers.create({ data: { ...dto } });
+  }
+
+  async deleteDIDNumber(id: string) {
+    return this.prismaService.dIDNumbers.delete({
+      where: {
+        id
+      }
+    })
+  }
+
+  async updateDIDNumber(id: string, dto: UpdateDIDNumberDTO) {
+    return this.prismaService.dIDNumbers.update({
+      where: {
+        id
+      },
+      data: {
+        ...dto
+      }
+    })
+  }
+
 }

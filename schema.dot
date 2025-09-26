@@ -1,0 +1,88 @@
+digraph PrismaSchema {
+  rankdir=LR;
+  node [shape=box, style=filled, color=lightgoldenrod1];
+
+  // Core relations
+  CallLog -> Agent [label="agentId"];
+  CallLog -> User [label="userId"];
+
+  User -> SystemCompany [label="systemCompanyId"];
+  User -> Subscription [label="subscription"];
+
+  SmsLog -> SystemCompany [label="systemCompanyId"];
+
+  Subscription -> User [label="userId"];
+
+  Agent -> SystemCompany [label="systemCompanyId"];
+  Agent -> CallLog;
+  Agent -> ParkedCall;
+  Agent -> AgentInformation;
+  Agent -> AgentPJSIPConfig;
+
+  AgentPJSIPConfig -> Agent [label="agentId"];
+
+  IVRTree -> SystemCompany [label="systemCompanyId"];
+
+  IvrFiles -> SystemCompany [label="systemCompanyId"];
+
+  SystemCompany -> SIPProvider [label="sIPProviderId"];
+  SystemCompany -> Agent;
+  SystemCompany -> IVRTree;
+  SystemCompany -> ParkedCall;
+  SystemCompany -> User;
+  SystemCompany -> SmsLog;
+  SystemCompany -> IvrFiles;
+  SystemCompany -> CRMLeads;
+  SystemCompany -> CompanyMembers;
+  SystemCompany -> Services;
+  SystemCompany -> CRMAppointmentStatus;
+  SystemCompany -> Settings;
+
+  SIPProvider -> SIPProviderConfig;
+  SIPProvider -> RTPAddress;
+  SIPProvider -> ParkedCall;
+  SIPProvider -> SystemCompany;
+
+  SIPProviderConfig -> SIPProvider [label="sipProviderId"];
+
+  RTPAddress -> SIPProvider [label="sIPProviderId"];
+
+  ParkedCall -> Agent [label="agentId"];
+  ParkedCall -> SIPProvider [label="sIPProviderId"];
+  ParkedCall -> SystemCompany [label="systemCompanyId"];
+
+  Crm -> Appointment;
+
+  Appointment -> Crm [label="crmId"];
+
+  CRMAppointmentStatus -> SystemCompany [label="systemCompanyId"];
+  CRMAppointmentStatus -> CRMAppointment;
+
+  CRMLeads -> SystemCompany [label="systemCompanyId"];
+  CRMLeads -> Services;
+  CRMLeads -> CRMAppointment;
+
+  CRMAppointment -> CompanyMembers [label="companyMembersId"];
+  CRMAppointment -> CRMLeads [label="cRMLeadsId"];
+  CRMAppointment -> CRMAppointmentStatus [label="cRMAppointmentStatusId"];
+
+  CompanyMembers -> SystemCompany [label="systemCompanyId"];
+  CompanyMembers -> CRMAppointment;
+
+  Services -> SystemCompany [label="systemCompanyId"];
+  Services -> CRMLeads [label="cRMLeadsId"];
+
+  SIPEndpoints -> DIDNumbers;
+  SIPEndpoints -> Settings;
+
+  DIDNumbers -> SIPEndpoints [label="sIPEndpointsId"];
+
+  Extensions -> Settings;
+
+  AgentInformation -> Agent [label="agentId"];
+
+  Settings -> SIPEndpoints [label="sipProviderId"];
+  Settings -> SystemCompany [label="systemCompanyId"];
+  Settings -> Extensions [label="ivrId"];
+}
+
