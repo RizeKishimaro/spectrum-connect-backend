@@ -75,6 +75,19 @@ export class DialerService extends EventEmitter implements OnModuleInit {
   async startAgentDial(agentId: string, dto: { slots?: number }) {
     const agent = await this.prisma.agent.findUnique({ where: { id: agentId } });
     if (!agent) throw new BadRequestException("Invalid Agent Detected By System!")
+    const settings = await this.prisma.settings.findFirst({
+      where: {
+        systemCompanyId: agent.systemCompanyId
+      },
+      include: {
+        sipProvider: true,
+        ivr: true,
+        DIDNumber: true
+      }
+    })
+    if (!settings?.sipProvider || !settings?.ivr || !settings.DIDNumber) {
+      throw new BadRequestException("Missing System Settings Please Tell Your Administrator!")
+    }
     const agentInformation = await this.prisma.agentInformation.findFirst({
       where: {
         agentId: agent.id
@@ -139,6 +152,19 @@ export class DialerService extends EventEmitter implements OnModuleInit {
     const agent = await this.prisma.agent.findUnique({ where: { id: agentId } });
 
     if (!agent) throw new BadRequestException('Agent not found');
+    const settings = await this.prisma.settings.findFirst({
+      where: {
+        systemCompanyId: agent.systemCompanyId
+      },
+      include: {
+        sipProvider: true,
+        ivr: true,
+        DIDNumber: true
+      }
+    })
+    if (!settings?.sipProvider || !settings?.ivr || !settings.DIDNumber) {
+      throw new BadRequestException("Missing System Settings Please Tell Your Administrator!")
+    }
     const agentInformation = await this.prisma.agentInformation.findFirst({
       where: {
         agentId: agent.id
@@ -399,10 +425,14 @@ export class DialerService extends EventEmitter implements OnModuleInit {
       try {
         const settings = await this.prisma.settings.findFirst({
           where: { systemCompanyId },
-          include: { sipProvider: true, ivr: true },
+          include: {
+            sipProvider: true,
+            ivr: true,
+            DIDNumber: true
+          },
         });
 
-        if (!settings?.sipProvider) {
+        if (!settings?.sipProvider || !settings?.ivr || !settings.DIDNumber) {
           this.logger.warn(`⚠️ No System Settings found. Retrying in 10s.`);
           setTimeout(() => this.blastDial(systemCompanyId, agentId), 10000);
           return;
@@ -412,7 +442,7 @@ export class DialerService extends EventEmitter implements OnModuleInit {
           {
             endpoint: `PJSIP/${lead.phone}@${settings.sipProvider.name}`,
             // endpoint: `PJSIP/${lead.phone}`,
-            callerId: settings?.ivr?.didNumber,
+            callerId: settings.DIDNumber?.didNumber,
             app: process.env.ARI_APP,
             timeout: 30,
             variables: {

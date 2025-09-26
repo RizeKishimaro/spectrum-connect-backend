@@ -1,0 +1,56 @@
+digraph DialerService {
+  rankdir=LR;
+  node [shape=box style=filled fillcolor=lightblue fontname="Fira Code"];
+
+  DialerService [shape=ellipse fillcolor=lightpink label="DialerService"];
+
+  // Injected services
+  ARI_CLIENT   [label="ARI Client"];
+  AMIProvider  [label="AMIProvider"];
+  PrismaService [label="PrismaService"];
+  AgentService [label="AgentService"];
+  CustomerCrmService [label="CustomerCrmService"];
+  LockService [label="LockService"];
+  WsGatewayGateway [label="WsGatewayGateway"];
+
+  // Dependencies
+  DialerService -> ARI_CLIENT;
+  DialerService -> AMIProvider;
+  DialerService -> PrismaService;
+  DialerService -> AgentService;
+  DialerService -> CustomerCrmService;
+  DialerService -> LockService;
+  DialerService -> WsGatewayGateway;
+
+  // Core Entities (from Prisma models)
+  CallLog [fillcolor=gold label="CallLog"];
+  Agent [fillcolor=gold label="Agent"];
+  CRMLeads [fillcolor=gold label="CRMLeads"];
+  Settings [fillcolor=gold label="Settings"];
+
+  PrismaService -> CallLog;
+  PrismaService -> Agent;
+  PrismaService -> CRMLeads;
+  PrismaService -> Settings;
+
+  // Events
+  StasisStart [shape=diamond fillcolor=mistyrose label="StasisStart"];
+  ChannelStateChange [shape=diamond fillcolor=mistyrose label="ChannelStateChange"];
+  ChannelDestroyed [shape=diamond fillcolor=mistyrose label="ChannelDestroyed"];
+  ChannelDtmfReceived [shape=diamond fillcolor=mistyrose label="DTMF Received"];
+
+  ARI_CLIENT -> StasisStart;
+  ARI_CLIENT -> ChannelStateChange;
+  ARI_CLIENT -> ChannelDestroyed;
+  ARI_CLIENT -> ChannelDtmfReceived;
+
+  // Event flow
+  StasisStart -> DialerService;
+  ChannelStateChange -> DialerService;
+  ChannelDestroyed -> DialerService;
+  ChannelDtmfReceived -> DialerService;
+
+  // Outgoing events to WebSocket gateway
+  DialerService -> WsGatewayGateway [label="emit(dialer:*)"];
+}
+

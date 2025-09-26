@@ -1,17 +1,25 @@
-import { IsIP, IsIn, IsOptional, IsString, MinLength } from 'class-validator';
+
+import { ApiProperty } from "@nestjs/swagger";
+import { IsArray, IsOptional, IsString } from "class-validator";
 
 export class CreateSipEndpointDto {
+  @ApiProperty()
   @IsString()
-  @MinLength(2)
-  name!: string;
+  name: string;
 
+  @ApiProperty({ required: false })
   @IsString()
   @IsOptional()
-  @IsIP('4', { message: 'ipHost must be a valid IPv4 address' })
-  ipHost?: string; // defaults server-side
+  ipHost?: string;
 
+  @ApiProperty({ required: false })
   @IsString()
-  @IsIn(['pjsip', 'chan_sip'])
   @IsOptional()
-  sipTech?: string; // defaults server-side
+  sipTech?: string;
+
+  @ApiProperty({ required: false, type: [String] })
+  @IsArray()
+  @IsOptional()
+  didIds?: string[];
 }
+

@@ -14,6 +14,7 @@ import { UpdateExtensionDto } from './dto/update-extension.dto';
 import { CreateSipEndpointDto } from './dto/create-sip-endpoints.dto';
 import { UpdateSipEndpointDto } from './dto/update-sip-endpoint.dto';
 import { UserSettingsDto } from './dto/user-settings.dto';
+import { CreateDIDNumberDTO } from './dto/create-didnumber.dto';
 
 @Controller('system-manager')
 export class SystemManagerController {
@@ -105,9 +106,37 @@ export class SystemManagerController {
     return this.systemManagerService.findAll(search);
   }
 
+  @Get("did-number")
+  async getAllDIDNumbers() {
+    const data = await this.systemManagerService.getAllDIDNumber()
+    return data
+
+  }
+  @Post("did-number")
+  async createDIDNumber(@Body() dto: CreateDIDNumberDTO) {
+    return await this.systemManagerService.createDIDNumber(dto)
+  }
+
   @Get('sip-endpoints/:id')
   findOne(@Param('id') id: string) {
     return this.systemManagerService.findOne(id);
+  }
+  @Get("sip-endpoints/:id/didNumbers")
+  async findDIDNumbers(@Param("id") endpointId: string) {
+    return await this.systemManagerService.getEndpointDIDInformation(endpointId)
+  }
+
+
+
+
+  @Patch("did-number/:id")
+  async updateDIDNumber(@Param("id") id: string, @Body() dto: CreateDIDNumberDTO) {
+    return await this.systemManagerService.updateDIDNumber(id, dto)
+  }
+
+  @Delete("did-number/:id")
+  async deleteDIDNumber(@Param("id") id: string) {
+    return await this.systemManagerService.deleteDIDNumber(id)
   }
 
   @Patch('sip-endpoints/:id')
@@ -119,6 +148,7 @@ export class SystemManagerController {
   remove(@Param('id') id: string) {
     return this.systemManagerService.remove(id);
   }
+
 
 
   @PublicRoute()
