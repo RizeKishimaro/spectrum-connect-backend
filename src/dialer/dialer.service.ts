@@ -399,10 +399,14 @@ export class DialerService extends EventEmitter implements OnModuleInit {
       try {
         const settings = await this.prisma.settings.findFirst({
           where: { systemCompanyId },
-          include: { sipProvider: true, ivr: true },
+          include: {
+            sipProvider: true,
+            ivr: true,
+            DIDNumber: true
+          },
         });
 
-        if (!settings?.sipProvider) {
+        if (!settings?.sipProvider || !settings?.ivr || !settings.DIDNumber) {
           this.logger.warn(`⚠️ No System Settings found. Retrying in 10s.`);
           setTimeout(() => this.blastDial(systemCompanyId, agentId), 10000);
           return;
@@ -410,9 +414,9 @@ export class DialerService extends EventEmitter implements OnModuleInit {
 
         ch.originate(
           {
-            endpoint: `PJSIP/${lead.phone}@${settings.sipProvider.name}`,
-            // endpoint: `PJSIP/${lead.phone}`,
-            callerId: settings?.ivr?.didNumber,
+            // endpoint: `PJSIP/${lead.phone}@${settings.sipProvider.name}`,
+            endpoint: `PJSIP/${lead.phone}`,
+            callerId: settings.DIDNumber?.didNumber,
             app: process.env.ARI_APP,
             timeout: 30,
             variables: {

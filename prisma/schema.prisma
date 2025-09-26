@@ -347,6 +347,7 @@ model DIDNumbers {
   updatedAt      DateTime      @updatedAt
   SIPEndpoints   SIPEndpoints? @relation(fields: [sIPEndpointsId], references: [id])
   sIPEndpointsId String?
+  Settings       Settings[]
 }
 
 model Extensions {
@@ -381,6 +382,9 @@ model Settings {
 
   systemCompanyId Int
   systemCompany   SystemCompany @relation(fields: [systemCompanyId], references: [id])
+
+  DIDNumber   DIDNumbers? @relation(fields: [dIDNumberId], references: [id])
+  dIDNumberId String?
 
   ivr   Extensions? @relation(fields: [ivrId], references: [id])
   ivrId String?

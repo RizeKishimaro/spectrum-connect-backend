@@ -25,11 +25,11 @@ import { AppointmentModule } from './appointment/appointment.module';
 import { WsGatewayModule } from './ws-gateway/ws-gateway.module';
 import { CustomerCrmModule } from './customer-crm/customer-crm.module';
 import { DialerModule } from './dialer/dialer.module';
-import { SmppModule } from './smpp/smpp.module';
-import { SmppProviderModule } from './utils/providers/smpp/smpp.module';
+import { ConfigModule } from '@nestjs/config';
 
 @Module({
   imports: [
+    ConfigModule.forRoot(),
     BullModule.forRoot({
       connection: {
         host: 'localhost',
@@ -54,7 +54,7 @@ import { SmppProviderModule } from './utils/providers/smpp/smpp.module';
     SystemManagerModule,
     ParkedCallModule,
     SubscriptionsModule,
-    SmsModule,
+    // SmsModule,
     CrmModule,
     AppointmentModule,
     WsGatewayModule,
@@ -63,8 +63,6 @@ import { SmppProviderModule } from './utils/providers/smpp/smpp.module';
       callerIdName: 'AutoDialer',
       ringTimeoutSec: 20,
     }),
-    SmppModule,
-    SmppProviderModule
   ],
   controllers: [AppController],
   providers: [

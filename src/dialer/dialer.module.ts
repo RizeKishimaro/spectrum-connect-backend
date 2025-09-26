@@ -13,6 +13,7 @@ import { DialerService } from './dialer.service';
 import { ARI_CLIENT } from 'src/utils/ari/ari.module';
 import * as Ari from 'ari-client';
 import { WsGatewayGateway } from 'src/ws-gateway/ws-gateway.gateway';
+import { ConfigService } from '@nestjs/config';
 
 
 export interface DialerModuleOptions {
@@ -43,8 +44,13 @@ export class DialerModule {
       providers: [
         {
           provide: ARI_CLIENT,
-          useFactory: async () => {
-            const ari = await Ari.connect(process.env.ARI_URL as string, process.env.ARI_USERNAME as string, process.env.ARI_PASSWORD as string, (error, client) => {
+          inject: [ConfigService],
+          useFactory: async (config: ConfigService) => {
+            const host = config.get<string>("ARI_URL");
+            const user = config.get<string>("ARI_USERNAME");
+            const password = config.get<string>("ARI_PASSWORD")
+            const ari = await Ari.connect(host as string, user as string, password as string, (error, client) => {
+
               client.start(process.env.ARI_APP as string)
             });
             return ari;
@@ -59,8 +65,8 @@ export class DialerModule {
         SystemManagerService,
         ParkedCallService,
         JwtService,
-        WsGatewayGateway
-
+        WsGatewayGateway,
+        ConfigService
       ],
       exports: [DialerService],
     };
