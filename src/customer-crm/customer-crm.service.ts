@@ -141,6 +141,9 @@ export class CustomerCrmService {
     const agent = await this.prisma.agent.findUnique({
       where: { id: req.user.user.id },
     });
+    console.log(agent)
+    console.log((agent) || (user?.roles === 'company_user'))
+    console.log(user?.roles)
     const baseWhere: Prisma.CRMLeadsWhereInput = q.search
       ? {
         OR: [
