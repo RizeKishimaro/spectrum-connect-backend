@@ -135,6 +135,7 @@ export class CustomerCrmService {
 
 
 
+
   async listLeads(q: QueryDto, req: ExpressRequest) {
     const user = await this.prisma.user.findUnique({
       where: { id: req.user.user.id },
@@ -182,6 +183,15 @@ export class CustomerCrmService {
       }
       : baseWhere;
 
+    // 🐾 Debug prints
+    console.log("🧑 User:", user);
+    console.log("🎭 Agent:", agent);
+    console.log("🔐 isAgent:", isAgent, "isCompanyUser:", isCompanyUser);
+    console.log("🏢 companyFilter:", JSON.stringify(companyFilter, null, 2));
+    console.log("🔍 searchFilter:", JSON.stringify(searchFilter, null, 2));
+    console.log("🧩 baseWhere:", JSON.stringify(baseWhere, null, 2));
+    console.log("📦 Final WHERE:", JSON.stringify(where, null, 2));
+
     const skip = (q.page ?? 0) * (q.pageSize ?? 20);
     const take = q.pageSize ?? 20;
 
@@ -198,7 +208,6 @@ export class CustomerCrmService {
 
     return { items, total, page: q.page ?? 0, pageSize: take };
   }
-
 
 
   async getLead(id: string) {
