@@ -11,6 +11,7 @@ import { ParkedCallService } from './parked-call/parked-call.service';
 import { PrismaService } from './utils/prisma/prisma.service';
 import { promises as fs } from "fs";
 import { Logger, ValidationPipe } from "@nestjs/common";
+import { urlencoded, json } from 'express';
 
 async function checkFileAccess(path: string) {
   try {
@@ -60,6 +61,8 @@ async function bootstrap() {
       whitelist: true,
     }),
   )
+  app.use(json({ limit: '50mb' }));
+  app.use(urlencoded({ extended: true, limit: '50mb' }));
 
   const config = new DocumentBuilder()
     .setTitle('Spectrem Connect API 🪐')
