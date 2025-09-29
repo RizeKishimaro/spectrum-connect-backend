@@ -149,11 +149,11 @@ export class CustomerCrmService {
           { companyName: { contains: q.search, mode: "insensitive" } },
           { address: { contains: q.search, mode: "insensitive" } },
 
-          (agent !== null) || (user?.roles === 'company_user')
+          (agent) || (user?.roles === 'company_user')
             ? { systemCompanyId: user?.systemCompanyId } : {}
         ],
       }
-      : (agent !== null) || (user?.roles === 'company_user') ? { systemCompanyId: user?.systemCompanyId } : {};
+      : (agent) || (user?.roles === 'company_user') ? { systemCompanyId: user?.systemCompanyId } : {};
 
 
 
