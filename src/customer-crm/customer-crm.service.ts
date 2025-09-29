@@ -134,43 +134,43 @@ export class CustomerCrmService {
 
 
 
+
   async listLeads(q: QueryDto, req: ExpressRequest) {
     const user = await this.prisma.user.findUnique({
       where: { id: req.user.user.id },
-    })
+    });
     const agent = await this.prisma.agent.findUnique({
       where: { id: req.user.user.id },
     });
 
     const isAgent = !!agent;
-    const isCompanyUser = user?.roles === 'company_user';
+    const isCompanyUser = user?.roles === "company_user";
 
-    const baseWhere: Prisma.CRMLeadsWhereInput = q.search
-      ? {
-        AND: [
-          // Always enforce company restriction if agent or company_user
-          ...(isAgent || isCompanyUser
-            ? [{ systemCompanyId: user?.systemCompanyId }]
-            : []),
-
-          // Search block
-          {
-            OR: [
-              { email: { contains: q.search, mode: "insensitive" } },
-              { phone: { contains: q.search, mode: "insensitive" } },
-              { companyName: { contains: q.search, mode: "insensitive" } },
-              { address: { contains: q.search, mode: "insensitive" } },
-            ],
-          },
-        ],
-      }
-      : (isAgent || isCompanyUser)
+    // 🔒 Security filter: always restrict by company if agent/company_user
+    const companyFilter: Prisma.CRMLeadsWhereInput =
+      isAgent || isCompanyUser
         ? { systemCompanyId: user?.systemCompanyId }
         : {};
 
+    // 🔍 Search filter
+    const searchFilter: Prisma.CRMLeadsWhereInput | undefined = q.search
+      ? {
+        OR: [
+          { email: { contains: q.search, mode: "insensitive" } },
+          { phone: { contains: q.search, mode: "insensitive" } },
+          { companyName: { contains: q.search, mode: "insensitive" } },
+          { address: { contains: q.search, mode: "insensitive" } },
+        ],
+      }
+      : undefined;
+
+    // 🧩 Combine filters
+    const baseWhere: Prisma.CRMLeadsWhereInput = {
+      AND: [companyFilter, ...(searchFilter ? [searchFilter] : [])],
+    };
 
     // 🔒 If agent exists, restrict to uncontacted + unlocked leads
-    const where: Prisma.CRMLeadsWhereInput = agent
+    const where: Prisma.CRMLeadsWhereInput = isAgent
       ? {
         AND: [
           baseWhere,
