@@ -148,7 +148,7 @@ export class CustomerCrmService {
           user?.roles === 'company_user' ? { systemCompanyId: user.systemCompanyId } : {}
         ],
       }
-      : {};
+      : user?.roles === 'company_user' ? { systemCompanyId: user.systemCompanyId } : {};
 
     const agent = await this.prisma.agent.findUnique({
       where: { id: req.user.user.id },
