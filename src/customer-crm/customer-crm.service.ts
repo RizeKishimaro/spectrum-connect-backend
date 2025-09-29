@@ -141,23 +141,32 @@ export class CustomerCrmService {
     const agent = await this.prisma.agent.findUnique({
       where: { id: req.user.user.id },
     });
-    console.log(agent)
-    console.log((agent) || (user?.roles === 'company_user'))
-    console.log(user?.roles)
+
+    const isAgent = !!agent;
+    const isCompanyUser = user?.roles === 'company_user';
+
     const baseWhere: Prisma.CRMLeadsWhereInput = q.search
       ? {
-        OR: [
-          { email: { contains: q.search, mode: "insensitive" } },
-          { phone: { contains: q.search, mode: "insensitive" } },
-          { companyName: { contains: q.search, mode: "insensitive" } },
-          { address: { contains: q.search, mode: "insensitive" } },
+        AND: [
+          // Always enforce company restriction if agent or company_user
+          ...(isAgent || isCompanyUser
+            ? [{ systemCompanyId: user?.systemCompanyId }]
+            : []),
 
-          (agent) || (user?.roles === 'company_user')
-            ? { systemCompanyId: user?.systemCompanyId } : {}
+          // Search block
+          {
+            OR: [
+              { email: { contains: q.search, mode: "insensitive" } },
+              { phone: { contains: q.search, mode: "insensitive" } },
+              { companyName: { contains: q.search, mode: "insensitive" } },
+              { address: { contains: q.search, mode: "insensitive" } },
+            ],
+          },
         ],
       }
-      : (agent) || (user?.roles === 'company_user') ? { systemCompanyId: user?.systemCompanyId } : {};
-
+      : (isAgent || isCompanyUser)
+        ? { systemCompanyId: user?.systemCompanyId }
+        : {};
 
 
     // 🔒 If agent exists, restrict to uncontacted + unlocked leads
