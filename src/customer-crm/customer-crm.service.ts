@@ -135,6 +135,9 @@ export class CustomerCrmService {
 
 
   async listLeads(q: QueryDto, req: ExpressRequest) {
+    const user = await this.prisma.user.findUnique({
+      where: { id: req.user.user.id },
+    })
     const baseWhere: Prisma.CRMLeadsWhereInput = q.search
       ? {
         OR: [
@@ -142,6 +145,7 @@ export class CustomerCrmService {
           { phone: { contains: q.search, mode: "insensitive" } },
           { companyName: { contains: q.search, mode: "insensitive" } },
           { address: { contains: q.search, mode: "insensitive" } },
+          user?.roles === 'company_user' ? { systemCompanyId: user.systemCompanyId } : {}
         ],
       }
       : {};
