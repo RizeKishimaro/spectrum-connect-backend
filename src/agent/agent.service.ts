@@ -41,7 +41,7 @@ export class AgentService {
       },
     });
 
-    return new Promise((resolve) => {
+    const availableEndpoints = await new Promise<Agent[]>((resolve) => {
       const available: any[] = [];
 
       const onEvent = (event) => {
@@ -61,6 +61,8 @@ export class AgentService {
       this.amiService.on('managerevent', onEvent);
       this.amiService.action({ Action: 'PJSIPShowEndpoints' });
     });
+    console.log(availableEndpoints)
+    return availableEndpoints;
   }
 
 
