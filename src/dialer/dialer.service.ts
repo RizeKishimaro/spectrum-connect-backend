@@ -139,6 +139,7 @@ export class DialerService extends EventEmitter implements OnModuleInit {
         return;
       }
     }
+    await this.blastDial(agent.systemCompanyId, agent.id);
 
   }
 
