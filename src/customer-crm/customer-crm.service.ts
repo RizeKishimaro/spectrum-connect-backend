@@ -146,11 +146,13 @@ export class CustomerCrmService {
 
     const isAgent = !!agent;
     const isCompanyUser = user?.roles === "company_user";
+    const companyId =
+      isAgent ? agent.systemCompanyId : isCompanyUser ? user?.systemCompanyId : undefined;
 
     // 🔒 Security filter: always restrict by company if agent/company_user
     const companyFilter: Prisma.CRMLeadsWhereInput =
       isAgent || isCompanyUser
-        ? { systemCompanyId: user?.systemCompanyId }
+        ? { systemCompanyId: companyId }
         : {};
 
     // 🔍 Search filter
