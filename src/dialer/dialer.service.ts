@@ -28,7 +28,7 @@ export class DialerService extends EventEmitter implements OnModuleInit {
   private agentRunning: Record<string, { slots: number; active: number }> = {};
   private channelToMeta: Record<string, Meta> = {};
   private onHoldTimers: Record<string, NodeJS.Timeout> = {};
-  private holdQueue: Record<string, string> = {}; // callLogId -> customerChannelId
+  private holdQueue: Record<string, any> = {}; // callLogId -> customerChannelId
   private holdTickTimer?: NodeJS.Timeout;
   private agentTimers: Record<string, NodeJS.Timeout> = {};
 
@@ -72,6 +72,13 @@ export class DialerService extends EventEmitter implements OnModuleInit {
   // ===== Public controls =====================================================
 
 
+  private countHeld(systemCompanyId: number): number {
+    let n = 0;
+    for (const [, v] of Object.entries(this.holdQueue)) {
+      if (v.systemCompanyId === systemCompanyId) n++;
+    }
+    return n;
+  }
   async startAgentDial(agentId: string, dto: { slots?: number }) {
     const agent = await this.prisma.agent.findUnique({ where: { id: agentId } });
     if (!agent) throw new BadRequestException("Invalid Agent Detected By System!")
@@ -121,7 +128,18 @@ export class DialerService extends EventEmitter implements OnModuleInit {
 
     this.ws.emit('dialer:start', { agentId, name: agent.name, systemCompanyId: agent.systemCompanyId, slots });
 
-    await this.blastDial(agent.systemCompanyId, agent.id);
+
+    const callLimit = settings.callLimit ?? 0;
+    if (callLimit > 0) {
+      const heldNow = this.countHeld(agent.systemCompanyId); // 🌸 using the helper
+      if (heldNow >= callLimit) {
+        this.logger.warn(
+          `⛔ Hold queue is already at callLimit for company ${agent.systemCompanyId}: ${heldNow}/${callLimit}. BlastDial will not start.`
+        );
+        return;
+      }
+    }
+
   }
 
 
@@ -576,7 +594,16 @@ export class DialerService extends EventEmitter implements OnModuleInit {
       } catch (e) {
         this.logger.warn(`Could not start MOH on ${ch.id}: ${(e as Error).message}`);
       }
-      this.holdQueue[callLogId] = ch.id;
+
+      const callLogWithAgent = await this.prisma.callLog.findUnique({
+        where: { id: callLogId },
+        include: { agent: true },
+      });
+      const systemCompanyId = callLogWithAgent?.agent?.systemCompanyId ?? 0;
+
+      // store structured entry 🌸
+      this.holdQueue[callLogId] = { channelId: ch.id, systemCompanyId };
+
       this.setHoldTimeout(ch.id, callLogId);
       this.ws.emit('dialer:ringing', {
         callLogId,
