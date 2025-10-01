@@ -697,8 +697,8 @@ export class SystemManagerService {
         data: {
           blastCount: settingsDto.blastCount,
           callLimit: settingsDto.callLimit,
-          sipProviderId: settingsDto.sipProviderId,
-          ivrId: settingsDto.ivrId,
+          sipProviderId: settingsDto.sipProviderId ?? null,
+          ivrId: settingsDto.ivrId ?? null,
           dIDNumberId: settingsDto.didNumberId ?? null,
         },
       });
@@ -709,8 +709,8 @@ export class SystemManagerService {
           systemCompanyId,
           blastCount: settingsDto.blastCount,
           callLimit: settingsDto.callLimit,
-          sipProviderId: settingsDto.sipProviderId,
-          ivrId: settingsDto.ivrId,
+          sipProviderId: settingsDto.sipProviderId ?? null,
+          ivrId: settingsDto.ivrId ?? null,
           dIDNumberId: settingsDto.didNumberId ?? null,
         },
       });
