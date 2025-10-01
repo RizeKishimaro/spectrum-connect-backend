@@ -29,8 +29,14 @@ export class AgentService {
   }
 
 
-  async findFreeAgent(systemCompanyId?: number) {
-    return this.prisma.agent.findFirst({ where: { status: 'AVAILABLE', ...(systemCompanyId ? { systemCompanyId } : {}) } });
+
+  async findAllFreeAgents(systemCompanyId?: number) {
+    return this.prisma.agent.findMany({
+      where: {
+        status: 'AVAILABLE',
+        ...(systemCompanyId ? { systemCompanyId } : {}),
+      },
+    });
   }
 
   async findAllFreeAgent(systemCompanyId?: number): Promise<Agent[]> {

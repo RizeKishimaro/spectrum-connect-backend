@@ -642,14 +642,19 @@ export class DialerService extends EventEmitter implements OnModuleInit {
       return;
     }
 
+
     if (meta.role === 'customer') {
-      const free = await this.agents.findFreeAgent();
-      this.logger.debug({ freeAgent: free }, '👀 [AGENT SEARCH]');
-      if (!free) {
+      const freeAgents = await this.agents.findAllFreeAgents();
+      this.logger.debug({ freeAgents }, '👀 [AGENT SEARCH]');
+
+      if (freeAgents.length === 0) {
         this.logger.warn(`⚠️ No free agents → keeping customer ${ch.id} on hold`);
         this.holdQueue[meta.callLogId] = ch.id;
         return;
       }
+
+      // 🌸 Pick one randomly
+      const free = freeAgents[Math.floor(Math.random() * freeAgents.length)];
 
       // Mark agent RINGING
       await this.agents.markStatus(free.id, 'RINGING');
@@ -702,7 +707,8 @@ export class DialerService extends EventEmitter implements OnModuleInit {
           "PJSIP_HEADER(add,X-LeadId)": meta.leadId,
         },
       });
-    } else if (meta.role === 'agent') {
+    }
+    else if (meta.role === 'agent') {
       // Bridge with customer
       const customerChId = this.findCustomerChannel(meta.callLogId);
       if (!customerChId) {
