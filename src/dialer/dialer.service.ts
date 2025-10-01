@@ -79,6 +79,7 @@ export class DialerService extends EventEmitter implements OnModuleInit {
     }
     return n;
   }
+
   async startAgentDial(agentId: string, dto: { slots?: number }) {
     const agent = await this.prisma.agent.findUnique({ where: { id: agentId } });
     if (!agent) throw new BadRequestException("Invalid Agent Detected By System!")
@@ -408,16 +409,8 @@ export class DialerService extends EventEmitter implements OnModuleInit {
       setTimeout(() => this.blastDial(systemCompanyId, agentId), 5000);
       return;
     }
-    const settings = await this.prisma.settings.findFirst({
-      where: { systemCompanyId },
-      include: {
-        sipProvider: true,
-        ivr: true,
-        DIDNumber: true
-      },
-    });
 
-    const blast = freeCount * 2;
+    const blast = freeCount / 2;
     this.logger.log(`🚀 Blasting ${blast} calls for ${freeCount} free agents`);
 
     for (let i = 0; i < blast; i++) {
@@ -438,7 +431,14 @@ export class DialerService extends EventEmitter implements OnModuleInit {
           agentId,
         },
       });
-
+      const settings = await this.prisma.settings.findFirst({
+        where: { systemCompanyId },
+        include: {
+          sipProvider: true,
+          ivr: true,
+          DIDNumber: true
+        },
+      });
       if (!settings) {
         this.logger.warn(`⚠️ No System Settings found. Retrying in 10s.`);
         setTimeout(() => this.blastDial(systemCompanyId, agentId), 10000);
@@ -513,7 +513,7 @@ export class DialerService extends EventEmitter implements OnModuleInit {
 
     this.agentTimers[agentId] = setTimeout(
       () => this.blastDial(systemCompanyId, agentId),
-      5000
+      30000
     );
 
   }
