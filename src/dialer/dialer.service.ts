@@ -410,7 +410,9 @@ export class DialerService extends EventEmitter implements OnModuleInit {
       return;
     }
 
-    const blast = freeCount / 2;
+    let blast = Math.floor(freeCount / 2);
+    blast = Math.max(blast, 1);
+    blast = Math.min(blast, 5);
     this.logger.log(`🚀 Blasting ${blast} calls for ${freeCount} free agents`);
 
     for (let i = 0; i < blast; i++) {
