@@ -129,16 +129,7 @@ export class DialerService extends EventEmitter implements OnModuleInit {
     this.ws.emit('dialer:start', { agentId, name: agent.name, systemCompanyId: agent.systemCompanyId, slots });
 
 
-    const callLimit = settings.callLimit ?? 0;
-    if (callLimit > 0) {
-      const heldNow = this.countHeld(agent.systemCompanyId); // 🌸 using the helper
-      if (heldNow >= callLimit) {
-        this.logger.warn(
-          `⛔ Hold queue is already at callLimit for company ${agent.systemCompanyId}: ${heldNow}/${callLimit}. BlastDial will not start.`
-        );
-        return;
-      }
-    }
+
     await this.blastDial(agent.systemCompanyId, agent.id);
 
   }
@@ -417,6 +408,14 @@ export class DialerService extends EventEmitter implements OnModuleInit {
       setTimeout(() => this.blastDial(systemCompanyId, agentId), 5000);
       return;
     }
+    const settings = await this.prisma.settings.findFirst({
+      where: { systemCompanyId },
+      include: {
+        sipProvider: true,
+        ivr: true,
+        DIDNumber: true
+      },
+    });
 
     const blast = freeCount * 2;
     this.logger.log(`🚀 Blasting ${blast} calls for ${freeCount} free agents`);
@@ -440,16 +439,25 @@ export class DialerService extends EventEmitter implements OnModuleInit {
         },
       });
 
+      if (!settings) {
+        this.logger.warn(`⚠️ No System Settings found. Retrying in 10s.`);
+        setTimeout(() => this.blastDial(systemCompanyId, agentId), 10000);
+        return;
+      }
+      const callLimit = settings.callLimit ?? 0;
+      if (callLimit > 0) {
+        const heldNow = this.countHeld(systemCompanyId); // 🌸 using the helper
+        if (heldNow >= callLimit) {
+          this.logger.warn(
+            `⛔ Hold queue is already at callLimit for company ${systemCompanyId}: ${heldNow}/${callLimit}. BlastDial will not start.`
+          );
+          return;
+        }
+      }
+
       const ch = this.ari.Channel();
       try {
-        const settings = await this.prisma.settings.findFirst({
-          where: { systemCompanyId },
-          include: {
-            sipProvider: true,
-            ivr: true,
-            DIDNumber: true
-          },
-        });
+
 
         if (!settings?.sipProvider || !settings?.ivr || !settings.DIDNumber) {
           this.logger.warn(`⚠️ No System Settings found. Retrying in 10s.`);
