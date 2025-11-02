@@ -26,4 +26,6 @@ export class AppController {
   async getSummary(@Req() req: ExpressRequest) {
     return this.appService.getSummary(req.user.user.systemCompanyId)
   }
+
+
 }

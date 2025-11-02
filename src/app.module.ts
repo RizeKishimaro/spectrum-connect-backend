@@ -26,6 +26,7 @@ import { WsGatewayModule } from './ws-gateway/ws-gateway.module';
 import { CustomerCrmModule } from './customer-crm/customer-crm.module';
 import { DialerModule } from './dialer/dialer.module';
 import { ConfigModule } from '@nestjs/config';
+import { VoicemailModule } from './voicemail/voicemail.module';
 
 @Module({
   imports: [
@@ -63,6 +64,7 @@ import { ConfigModule } from '@nestjs/config';
       callerIdName: 'AutoDialer',
       ringTimeoutSec: 20,
     }),
+    VoicemailModule,
   ],
   controllers: [AppController],
   providers: [

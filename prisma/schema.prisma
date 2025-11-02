@@ -96,6 +96,7 @@ model Agent {
   ParkedCall       ParkedCall[]
   AgentInformation AgentInformation[]
   CheckInOut       CheckInOut[]
+  Voicemail        Voicemail[]
 }
 
 model CheckInOut {
@@ -165,6 +166,7 @@ model SystemCompany {
   Services             Services[]
   CRMAppointmentStatus CRMAppointmentStatus[]
   Settings             Settings[]
+  Voicemail            Voicemail[]
 }
 
 model SIPProvider {
@@ -399,6 +401,24 @@ model Settings {
 
   ivr   Extensions? @relation(fields: [ivrId], references: [id])
   ivrId String?
+}
+
+model Voicemail {
+  id              String   @id @default(cuid())
+  agentId         String
+  mailbox         String
+  callerId        String?
+  duration        Int?
+  fileUrl         String
+  createdAt       DateTime @default(now())
+  isNew           Boolean  @default(true)
+  systemCompanyId Int?
+
+  agent         Agent          @relation(fields: [agentId], references: [id])
+  systemCompany SystemCompany? @relation(fields: [systemCompanyId], references: [id])
+
+  @@index([agentId])
+  @@index([systemCompanyId])
 }
 
 enum AppointmentStatus {
