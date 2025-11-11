@@ -280,4 +280,3 @@ export class SmsController {
     return this.prisma.smsLog.findUnique({ where: { id } })
   }
 }
-

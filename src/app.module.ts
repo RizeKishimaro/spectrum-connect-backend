@@ -27,6 +27,7 @@ import { CustomerCrmModule } from './customer-crm/customer-crm.module';
 import { DialerModule } from './dialer/dialer.module';
 import { ConfigModule } from '@nestjs/config';
 import { VoicemailModule } from './voicemail/voicemail.module';
+import { SmppModule } from './smpp/smpp.module';
 
 @Module({
   imports: [
@@ -55,7 +56,7 @@ import { VoicemailModule } from './voicemail/voicemail.module';
     SystemManagerModule,
     ParkedCallModule,
     SubscriptionsModule,
-    // SmsModule,
+    SmsModule,
     CrmModule,
     AppointmentModule,
     WsGatewayModule,
@@ -65,6 +66,7 @@ import { VoicemailModule } from './voicemail/voicemail.module';
       ringTimeoutSec: 20,
     }),
     VoicemailModule,
+    SmppModule,
   ],
   controllers: [AppController],
   providers: [

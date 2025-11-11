@@ -13,6 +13,7 @@ export class SmsService {
     @InjectQueue('limitless') private smsQueue: Queue,
     @InjectQueue("commpeak") private commpeakQueue: Queue,
     @InjectQueue("topying") private TopyingQueue: Queue,
+    @InjectQueue("smppQueue") private smppQueue: Queue,
     private readonly prisma: PrismaService
   ) { }
 
@@ -301,16 +302,16 @@ export class SmsService {
 
       console.log(`📤 Queuing Commpeak SMS to ${phone}`);
 
-      // await this.smppQueue.add("send", {
-      //   numbers: phone,
-      //   message: processedMessage,
-      //   content: processedMessage,
-      //   systemCompanyId: data.companyId,
-      //   sender: data.sender,
-      //   smsLogId: logId,
-      //   billingDeduct: finalPrice,
-      //   senderId: sender
-      // });
+      await this.smppQueue.add("send", {
+        numbers: phone,
+        message: processedMessage,
+        content: processedMessage,
+        systemCompanyId: data.companyId,
+        sender: data.sender,
+        smsLogId: logId,
+        billingDeduct: finalPrice,
+        senderId: sender
+      });
     }
 
     return {
@@ -322,4 +323,4 @@ export class SmsService {
 
 
 
-} 
+}  
