@@ -17,6 +17,9 @@ import { TopyingProcessor } from './processors/topying.processor'
     BullModule.registerQueue({
       name: "topying"
     }),
+    BullModule.registerQueue({
+      name: "smppQueue"
+    })
   ],
   controllers: [SmsController],
   providers: [SmsService, SmsProcessor, CommpeakProcessor, TopyingProcessor],
