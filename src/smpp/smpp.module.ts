@@ -5,6 +5,6 @@ import { SmppProvider } from 'src/utils/providers/smpp/smpp.service';
 
 @Module({
   controllers: [SmppController],
-  providers: [SmppService, SmppProvider],
+  providers: [SmppService],
 })
 export class SmppModule { }
