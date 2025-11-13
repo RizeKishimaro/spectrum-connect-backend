@@ -2,7 +2,6 @@
 import { Injectable } from '@nestjs/common'
 import { InjectQueue } from '@nestjs/bull'
 import { Queue } from 'bullmq'
-import { SendSmsDto } from './dto/sms.dto'
 import { randomBytes } from 'crypto';
 import { PrismaService } from 'src/utils/prisma/prisma.service';
 import axios from 'axios';
@@ -189,69 +188,69 @@ export class SmsService {
 
 
 
-  async sendCommpeak(data: any) {
-    const numberList = Array.isArray(data.numbers)
-      ? data.numbers
-      : typeof data.numbers === "string"
-        ? data.numbers.split(",").map((n) => n.trim()).filter(n => n.length > 0)
-        : [];
+  // async sendCommpeak(data: any) {
+  //   const numberList = Array.isArray(data.numbers)
+  //     ? data.numbers
+  //     : typeof data.numbers === "string"
+  //       ? data.numbers.split(",").map((n) => n.trim()).filter(n => n.length > 0)
+  //       : [];
 
-    if (numberList.length === 0) {
-      console.log("📵 Bad phone number list");
-      throw new Error("No valid numbers provided nya~!");
-    }
+  //   if (numberList.length === 0) {
+  //     console.log("📵 Bad phone number list");
+  //     throw new Error("No valid numbers provided nya~!");
+  //   }
 
-    const markupMultiplier = 1.2;
-    const basePrice = 0.012; // 💸 Default Commpeak rate per SMS
-    const finalPrice = parseFloat((basePrice * markupMultiplier).toFixed(4));
+  //   const markupMultiplier = 1.2;
+  //   const basePrice = 0.012; // 💸 Default Commpeak rate per SMS
+  //   const finalPrice = parseFloat((basePrice * markupMultiplier).toFixed(4));
 
-    const pendingLogs = await Promise.all(
-      numberList.map(async (phone) => {
-        const processedMessage = this.replaceRandomPlaceholders(data.content);
-        const log = await this.prisma.smsLog.create({
-          data: {
-            sender: data.sender,
-            systemCompanyId: data.companyId,
-            numbers: phone,
-            content: processedMessage,
-            status: "pending",
-            success: 0,
-            service: "GOLD",
-            failed: 0,
-            route: 0,
-            charged: 0,
-            apiRaw: {},
-            direction: "outbound",
-          },
-        });
+  //   const pendingLogs = await Promise.all(
+  //     numberList.map(async (phone) => {
+  //       const processedMessage = this.replaceRandomPlaceholders(data.content);
+  //       const log = await this.prisma.smsLog.create({
+  //         data: {
+  //           sender: data.sender,
+  //           systemCompanyId: data.companyId,
+  //           numbers: phone,
+  //           content: processedMessage,
+  //           status: "pending",
+  //           success: 0,
+  //           service: "GOLD",
+  //           failed: 0,
+  //           route: 0,
+  //           charged: 0,
+  //           apiRaw: {},
+  //           direction: "outbound",
+  //         },
+  //       });
 
-        return {
-          phone,
-          processedMessage,
-          logId: log.id,
-        };
-      })
-    );
+  //       return {
+  //         phone,
+  //         processedMessage,
+  //         logId: log.id,
+  //       };
+  //     })
+  //   );
 
-    for (let i = 0; i < pendingLogs.length; i++) {
-      const { phone, processedMessage, logId, sender } = pendingLogs[i];
+  //   for (let i = 0; i < pendingLogs.length; i++) {
+  //     const { phone, processedMessage, logId, sender } = pendingLogs[i];
 
-      console.log(`📤 Queuing Commpeak SMS to ${phone}`);
+  //     console.log(`📤 Queuing Commpeak SMS to ${phone}`);
 
-      await this.commpeakQueue.add("send", {
-        numbers: [phone],
-        message: processedMessage,
-        smsLogId: logId,
-        billingDeduct: finalPrice,
-        senderId: sender
-      });
-    }
+  //     await this.commpeakQueue.add("send", {
+  //       numbers: [phone],
+  //       message: processedMessage,
+  //       smsLogId: logId,
+  //       billingDeduct: finalPrice,
+  //       senderId: sender
+  //     });
+  //   }
 
-    return {
-      status: "queued",
-      count: numberList.length,
-    };
-  }
+  //   return {
+  //     status: "queued",
+  //     count: numberList.length,
+  //   };
+  // }
 
   async sendSMPPSms(data: any) {
     const numberList = Array.isArray(data.numbers)
@@ -268,6 +267,7 @@ export class SmsService {
     const markupMultiplier = 1.2;
     const basePrice = 0.012; // 💸 Default Commpeak rate per SMS
     const finalPrice = parseFloat((basePrice * markupMultiplier).toFixed(4));
+    console.log(data)
 
     const pendingLogs = await Promise.all(
       numberList.map(async (phone) => {
@@ -280,9 +280,9 @@ export class SmsService {
             content: processedMessage,
             status: "pending",
             success: 0,
-            service: "GOLD",
+            service: "SMPP",
             failed: 0,
-            route: 0,
+            route: data.route,
             charged: 0,
             apiRaw: {},
             direction: "outbound",
@@ -300,13 +300,14 @@ export class SmsService {
     for (let i = 0; i < pendingLogs.length; i++) {
       const { phone, processedMessage, logId, sender } = pendingLogs[i];
 
-      console.log(`📤 Queuing Commpeak SMS to ${phone}`);
+      console.log(`📤 Queuing SMPP SMS to ${phone}`);
 
       await this.smppQueue.add("send", {
         numbers: phone,
         message: processedMessage,
         content: processedMessage,
         systemCompanyId: data.companyId,
+        route: data.route,
         sender: data.sender,
         smsLogId: logId,
         billingDeduct: finalPrice,

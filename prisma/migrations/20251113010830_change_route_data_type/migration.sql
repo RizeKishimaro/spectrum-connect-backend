@@ -1,0 +1,3 @@
+-- AlterTable
+ALTER TABLE "sms_logs" ALTER COLUMN "route" DROP NOT NULL,
+ALTER COLUMN "route" SET DATA TYPE TEXT;

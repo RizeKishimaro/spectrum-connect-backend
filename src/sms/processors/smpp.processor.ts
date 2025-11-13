@@ -1,15 +1,13 @@
 
+import { Processor, WorkerHost } from "@nestjs/bullmq";
+import { Injectable } from "@nestjs/common";
+import { Job } from "bullmq";
+import { PrismaService } from "src/utils/prisma/prisma.service";
+import { SmppSimboxProvider } from "src/utils/providers/smpp/smpp-simbox.processor";
+import { SmppWholesaleProvider } from "src/utils/providers/smpp/smpp-wholesale.service";
+import { SmppProvider } from "src/utils/providers/smpp/smpp.service";
 
-// sms.consumer.ts
-import { Processor, WorkerHost } from '@nestjs/bullmq';
-import { Job } from 'bullmq';
-import { Injectable } from '@nestjs/common';
-import { PrismaService } from 'src/utils/prisma/prisma.service';
-import { SmppSimboxProvider } from 'src/utils/providers/smpp/smpp-simbox.processor';
-import { SmppProvider } from 'src/utils/providers/smpp/smpp.service';
-import { SmppWholesaleProvider } from 'src/utils/providers/smpp/smpp-wholesale.service';
-
-@Processor('smpp-sms')
+@Processor("smppQueue")
 @Injectable()
 export class SMPPSmsConsumer extends WorkerHost {
   constructor(
@@ -22,84 +20,135 @@ export class SMPPSmsConsumer extends WorkerHost {
   }
 
   async process(job: Job<any>): Promise<any> {
-    const { sender, numbers, content, route, systemCompanyId } = job.data;
-    console.log(sender, numbers, content, route, systemCompanyId)
+    // 🩵 we can support both "send" and "dlr" tasks
+    if (job.name === "dlr") return this.handleDLR(job.data);
+    return this.handleSend(job.data);
+  }
 
-    function safeJson(data: any) {
+  // 🌸 sending SMS logic
+  private async handleSend(data: any) {
+    const { sender, numbers, content, route, systemCompanyId } = data;
+    let provider: any;
+
+    switch (route) {
+      case "wholesale":
+        provider = this.smppWholesaleProvider;
+        break;
+      case "simbox":
+        provider = this.smppSimboxProvider;
+        break;
+      default:
+        provider = this.smppProvider;
+        break;
+    }
+
+    const safeJson = (d: any) => {
       try {
-        return JSON.parse(JSON.stringify(data));
+        return JSON.parse(JSON.stringify(d));
       } catch (e) {
         return { error: "Serialization failed", raw: String(e) };
       }
-    }
-    let status = 'FAILED';
+    };
+
+    let status = "FAILED";
     let success = 0;
     let failed = 1;
     let apiRaw: any = {};
-
+    let messageId: string | null = null;
 
     try {
-      console.log(numbers)
-
       const pdu = await new Promise((resolve, reject) => {
-        this.smppProvider.session.submit_sm(
+        provider.session.submit_sm(
           {
-            source_addr: sender, // Sender ID
-            destination_addr: numbers, // Recipient
-
-            // TON/NPI for source
-            source_addr_ton: 5, // 5 = Alphanumeric (for sender ID "SMS")
-            source_addr_npi: 0, // 0 = Unknown
-
-            // TON/NPI for destination
-            dest_addr_ton: 1, // 1 = International (E.164 numbers)
-            dest_addr_npi: 1, // 1 = ISDN (E.164)
-
+            source_addr: sender,
+            destination_addr: numbers,
+            source_addr_ton: 5,
+            source_addr_npi: 0,
+            dest_addr_ton: 1,
+            dest_addr_npi: 1,
             short_message: content,
           },
-          (pdu) => {
-            if (pdu.command_status === 0) {
-              resolve(pdu);
-            } else {
-              reject(pdu);
-            }
-          },
+          (pdu) => (pdu.command_status === 0 ? resolve(pdu) : reject(pdu)),
         );
       });
+      console.log(pdu)
 
-      status = 'sent';
+      status = "SENT";
       success = 1;
       failed = 0;
-      apiRaw = safeJson(pdu); // ✅ ensure it's JSON-safe
-    } catch (err) {
-      console.log(err);
-      status = 'FAILED';
-      apiRaw = safeJson(err); // ✅ serialize errors too
-    }
-
-    console.log(status, success, failed, apiRaw)
-
-    try {
-
-      await this.prisma.smsLog.create({
+      apiRaw = safeJson(pdu);
+      messageId = (pdu as any).message_id ?? null;
+      const pduData = await this.prisma.smsLog.create({
         data: {
           sender,
           numbers,
           content,
-          route: 1,
+          route,
+          messageId,
           status,
           success,
           failed,
-          service: 'SMPP',
+          service: "SMPP",
           apiRaw,
           systemCompanyId,
-          direction: 'OUTBOUND',
+          direction: "OUTBOUND",
         },
       });
-    } catch (e) {
-      console.log(e)
+
+      console.log(pduData)
+    } catch (err) {
+      console.error("❌ SMPP send error:", err);
+      const pduData = await this.prisma.smsLog.create({
+        data: {
+          sender,
+          numbers,
+          content,
+          route,
+          messageId,
+          status,
+          success,
+          failed,
+          service: "SMPP",
+          apiRaw,
+          systemCompanyId,
+          direction: "OUTBOUND",
+        },
+      });
+      apiRaw = safeJson(err);
     }
+    console.log(messageId)
+
+
+
     return { status, numbers };
+  }
+
+  // 💌 delivery-report handler (runs from same queue)
+  private async handleDLR(data: any) {
+    const { messageId, status } = data;
+    console.log(`💌 Processing DLR → ${messageId} (${status})`);
+
+    const finalStatus =
+      status === "DELIVRD"
+        ? "DELIVERED"
+        : status === "UNDELIV"
+          ? "FAILED"
+          : status;
+
+    try {
+      const updated = await this.prisma.smsLog.updateMany({
+        where: { messageId },
+        data: { status: finalStatus },
+      });
+      if (updated.count === 0) {
+        console.warn(`⚠️ No log found for messageId ${messageId}`);
+      } else {
+        console.log(`✅ Updated message ${messageId} → ${finalStatus}`);
+      }
+    } catch (e) {
+      console.error("❌ Failed to update DLR:", e);
+      throw e; // Let BullMQ retry
+    }
   }
 }
 

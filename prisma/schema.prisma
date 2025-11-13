@@ -46,9 +46,10 @@ model SmsLog {
   sender          String
   numbers         String
   content         String
-  route           Int
+  route           String?
   status          String?
   success         Int
+  messageId       String?
   failed          Int
   charged         Float?
   service         String?

@@ -73,6 +73,7 @@ export class SubscriptionsService {
   async update(id: string, dto: UpdateSubscriptionDto) {
     const existing = await this.prisma.subscription.findUnique({ where: { id } });
     if (!existing) throw new NotFoundException('Subscription not found');
+    console.log(dto)
     return this.prisma.subscription.update({ where: { id }, data: { ...dto } });
   }
 

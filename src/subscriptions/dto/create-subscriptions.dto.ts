@@ -16,6 +16,14 @@ export class CreateSubscriptionDto {
 
   @ApiProperty()
   @IsInt()
+  smsBalance: number;
+
+  @ApiProperty()
+  @IsBoolean()
+  isSMSSubscribed: boolean;
+
+  @ApiProperty()
+  @IsInt()
   agentCount: number;
 
   @ApiProperty()
