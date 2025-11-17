@@ -28,6 +28,7 @@ import { DialerModule } from './dialer/dialer.module';
 import { ConfigModule } from '@nestjs/config';
 import { VoicemailModule } from './voicemail/voicemail.module';
 import { SmppModule } from './smpp/smpp.module';
+import { SipModule } from './debugger/sip/sip.module';
 
 @Module({
   imports: [
@@ -65,6 +66,7 @@ import { SmppModule } from './smpp/smpp.module';
       callerIdName: 'AutoDialer',
       ringTimeoutSec: 20,
     }),
+    SipModule,
     VoicemailModule,
     SmppModule,
   ],

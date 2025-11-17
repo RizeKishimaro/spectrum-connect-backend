@@ -404,6 +404,71 @@ model Settings {
   ivrId String?
 }
 
+model SipSession {
+  id        Int      @id @default(autoincrement())
+  callId    String   @unique
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  messages SipMessage[]
+  reports  QosReport[]
+
+  mediaAddresses MediaOffer[]
+}
+
+model QosReport {
+  id        Int        @id @default(autoincrement())
+  session   SipSession @relation(fields: [sessionId], references: [id])
+  sessionId Int        @unique
+
+  // Metrics captured from RTCP reports
+  packetsTransmitted Int    @default(0)
+  packetsLost        Int    @default(0)
+  jitterMs           Float  @default(0)
+  rttMs              Float  @default(0)
+  mos                Float? // MOS is often calculated or optional
+
+  // Metadata
+  reportType String // "SR" or "RR" (Sender/Receiver Report)
+  createdAt  DateTime @default(now())
+
+  // Optional: To help with high-speed query indexing
+  @@index([sessionId, createdAt])
+}
+
+// 💥 NEW MODEL FOR SDP IP ADDRESSES 💥
+model MediaOffer {
+  id        Int        @id @default(autoincrement())
+  session   SipSession @relation(fields: [sessionId], references: [id])
+  sessionId Int
+
+  sourceIp String
+
+  mediaC_IP String
+
+  mediaM_Port Int
+
+  mediaM_Protocol String
+
+  type String
+
+  createdAt DateTime @default(now())
+
+  @@index([sessionId])
+}
+
+model SipMessage {
+  id        Int        @id @default(autoincrement())
+  session   SipSession @relation(fields: [sessionId], references: [id])
+  sessionId Int
+
+  source      String
+  destination String
+  method      String
+  body        String
+  createdAt   DateTime @default(now())
+}
+
 model Voicemail {
   id              String   @id @default(cuid())
   agentId         String
