@@ -72,7 +72,7 @@ export class SipSessionService {
       orderBy: {
         createdAt: 'desc',
       },
-      take: limit,
+      take: 100,
       include: {
         session: {
           select: {
