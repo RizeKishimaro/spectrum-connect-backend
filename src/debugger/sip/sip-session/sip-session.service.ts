@@ -151,6 +151,7 @@ export class SipSessionService {
   async getAllSessions() {
     return this.prisma.sipSession.findMany({
       orderBy: { updatedAt: 'desc' },
+      take: 100,
       include: { messages: true, mediaAddresses: true }, // Added mediaAddresses include
     });
   }
