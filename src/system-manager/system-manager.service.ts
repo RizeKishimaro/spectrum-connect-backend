@@ -197,7 +197,7 @@ export class SystemManagerService {
     systemCompanyId: number
   ) {
     const isUpdate = !!body.id;
-    const timestampedName = `${body.name}}`;
+    const timestampedName = `${body.name}`;
     const jsonTree = JSON.stringify(body.tree);
 
     if (isUpdate) {

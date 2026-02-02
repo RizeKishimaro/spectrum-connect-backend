@@ -172,6 +172,7 @@ export class SystemManagerController {
 
   @Post("saveIVRTree")
   async saveIVRTree(@Body() body: any, @Req() req: ExpressRequest) {
+    console.log(body)
     this.systemManagerService.saveIVRTree(body, req.user.user.systemCompanyId)
     return body
   }

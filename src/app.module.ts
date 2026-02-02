@@ -57,7 +57,7 @@ import { SipModule } from './debugger/sip/sip.module';
     SystemManagerModule,
     ParkedCallModule,
     SubscriptionsModule,
-    SmsModule,
+    // SmsModule,
     CrmModule,
     AppointmentModule,
     WsGatewayModule,
@@ -68,7 +68,7 @@ import { SipModule } from './debugger/sip/sip.module';
     }),
     SipModule,
     VoicemailModule,
-    SmppModule,
+    // SmppModule,
   ],
   controllers: [AppController],
   providers: [

@@ -12,8 +12,8 @@ import { DLRConsumer } from "./dlr.processor";
         name: "dlrQueue"
       })
     ],
-    providers: [SmppProvider, SmppWholesaleProvider, SmppSimboxProvider, DLRConsumer],
-    exports: [SmppProvider, SmppSimboxProvider, SmppWholesaleProvider]
+    // providers: [SmppProvider, SmppWholesaleProvider, SmppSimboxProvider, DLRConsumer],
+    // exports: [SmppProvider, SmppSimboxProvider, SmppWholesaleProvider]
   }
 )
 export class SmppProviderModule {

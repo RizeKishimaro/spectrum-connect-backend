@@ -152,27 +152,65 @@ export function writeDialplanToFile(content: string) {
   console.log(`📁 Dialplan saved to ${filePath} ~ UwU`);
 }
 
-export function saveIvrDialplan(rootIvrNode: IvrNode, contextName = 'ivr-main') {
+export function saveIvrDialplan(
+  rootIvrNode: IvrNode,
+  contextName = "ivr-main"
+) {
   try {
-    const extensionsConfPath = path.join("/etc", "asterisk", "extensions_custom.conf");
-    const existingExts = parseExtensionsConf(extensionsConfPath);
-    console.log(existingExts, extensionsConfPath)
+    const asteriskDir = "/etc/asterisk";
+    const extensionsConfPath = path.join(asteriskDir, "extensions.conf");
+    const customConfPath = path.join(asteriskDir, "extensions_custom.conf");
 
+    // 1️⃣ Ensure extensions_custom.conf exists
+    if (!fs.existsSync(customConfPath)) {
+      fs.writeFileSync(customConfPath, "; Custom IVR dialplans\n\n", {
+        encoding: "utf8",
+      });
+      console.log("✨ Created extensions_custom.conf");
+    }
 
-    const conflicts = findConflicts(existingExts, rootIvrNode, contextName, false); // context may be new!
+    // 2️⃣ Ensure extensions.conf includes extensions_custom.conf
+    if (!fs.existsSync(extensionsConfPath)) {
+      throw new Error("extensions.conf not found");
+    }
+
+    const extensionsConf = fs.readFileSync(extensionsConfPath, "utf8");
+
+    const includeLine = "#include extensions_custom.conf";
+
+    if (!extensionsConf.includes(includeLine)) {
+      const updatedConf = `${includeLine}\n${extensionsConf}`;
+      fs.writeFileSync(extensionsConfPath, updatedConf, {
+        encoding: "utf8",
+      });
+      console.log("✨ Added #include extensions_custom.conf to extensions.conf");
+    }
+
+    // 3️⃣ Continue existing logic
+    const existingExts = parseExtensionsConf(customConfPath);
+
+    const conflicts = findConflicts(
+      existingExts,
+      rootIvrNode,
+      contextName,
+      false // context may be new
+    );
 
     if (conflicts.length) {
-      conflicts.forEach(err => console.error("❌", err));
-      throw new BadRequestException("Conflicts detected in extensions.conf! Fix them before saving, nya~!");
+      conflicts.forEach((err) => console.error("❌", err));
+      throw new BadRequestException(
+        "Conflicts detected in extensions.conf! Fix them before saving, nya~!"
+      );
     }
-    console.log(conflicts)
 
     const dialplanContent = generateDialplan(rootIvrNode, contextName);
     writeDialplanToFile(dialplanContent);
 
   } catch (err) {
     console.error("⚠️ Error saving IVR dialplan:", err);
-    throw new InternalServerErrorException("Something went wrong while saving IVR")
+    throw new InternalServerErrorException(
+      "Something went wrong while saving IVR"
+    );
   }
 }
 export async function deleteIVRTree(IVR: IVRTree) {
