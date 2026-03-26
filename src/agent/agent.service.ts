@@ -106,6 +106,7 @@ export class AgentService {
         agentCount: true,
       },
     })
+    console.log(maxAgents);
     if (!maxAgents) {
       throw new BadRequestException('Subscription not found');
     }
