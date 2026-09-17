@@ -891,7 +891,6 @@ export class DialerService extends EventEmitter implements OnModuleInit {
       }
     }
 
-    // Cleanup
     if (meta.callLogId) {
       this.logger.debug(`🧹 Cleaning holdQueue for callLog ${meta.callLogId}`);
       delete this.holdQueue[meta.callLogId];
@@ -901,7 +900,6 @@ export class DialerService extends EventEmitter implements OnModuleInit {
     delete this.channelToMeta[ch.id];
   }
 
-  // ===== DTMF & Transfers ====================================================
 
   private async onDtmfReceived(ev: any, ch: Channel) {
     // de-dup very chatty DTMF events
@@ -922,7 +920,6 @@ export class DialerService extends EventEmitter implements OnModuleInit {
       if (!transfer) {
         await this.handleBlindTransfer(meta);
       } else {
-        // finalize transfer: stop MOH (if any) and send customer to dialplan
         const ext = transfer.digits.join('');
         this.logger.log(`🔀 Transfer to ${ext}@dialer-ext`);
         try {
@@ -936,7 +933,6 @@ export class DialerService extends EventEmitter implements OnModuleInit {
         } catch (e) {
           this.logger.error(`Blind transfer failed`, e);
         }
-        // hang up agent leg after initiating transfer
         try {
           await this.safeHangup(this.ari.Channel(transfer.agentChannelId));
         } catch { }
@@ -945,14 +941,12 @@ export class DialerService extends EventEmitter implements OnModuleInit {
       return;
     }
 
-    // collect digits while in transfer mode
     if (transfer) {
       transfer.digits.push(ev.digit);
       this.logger.debug(`DTMF during transfer: digits=${transfer.digits.join('')}`);
       return;
     }
 
-    // attended transfer control
     switch (ev.digit) {
       case '*':
         await this.startAttendedTransfer(meta, ch);
@@ -966,7 +960,6 @@ export class DialerService extends EventEmitter implements OnModuleInit {
     }
   }
 
-  // Blind transfer: play pbx tone to agent, put customer on MOH, collect digits until next '#'
   private async handleBlindTransfer(meta: Meta) {
     const customerChId = this.findCustomerChannel(meta.callLogId);
     if (!customerChId) return;
@@ -980,28 +973,23 @@ export class DialerService extends EventEmitter implements OnModuleInit {
 
     this.logger.log(`🚀 Blind transfer start for call ${meta.callLogId}`);
 
-    // init buffer
     this.pendingTransfers.set(meta.callLogId, {
       digits: [],
       agentChannelId: agentChId,
       customerChannelId: customerChId,
     });
 
-    // tone to agent
     try {
       const pbx = this.ari.Playback();
       agentCh.play({ media: 'sound:pbx-transfer' }, pbx);
     } catch { }
 
-    // hold the customer during entry
     try {
       await customerCh.startMoh();
     } catch { }
   }
 
-  // (Optional) attended transfer scaffolding
   private async startAttendedTransfer(meta: Meta, ch: Channel) {
-    // you can extend this to create a consult call, etc.
     this.logger.log(`🤝 Attended transfer requested for ${meta.callLogId} (stub)`);
   }
   private async confirmAttendedTransfer(callLogId: string) {

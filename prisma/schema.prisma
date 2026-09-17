@@ -168,6 +168,8 @@ model SystemCompany {
   CRMAppointmentStatus CRMAppointmentStatus[]
   Settings             Settings[]
   Voicemail            Voicemail[]
+  telegramChats        TelegramChat[]
+  TelegramDIDNumbers   TelegramDIDNumbers[]
 }
 
 model SIPProvider {
@@ -485,6 +487,29 @@ model Voicemail {
 
   @@index([agentId])
   @@index([systemCompanyId])
+}
+
+model TelegramDIDNumbers {
+  id        String @id @default(cuid())
+  didNumber String
+
+  systemCompanyId Int
+  systemCompany   SystemCompany @relation(fields: [systemCompanyId], references: [id])
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model TelegramChat {
+  id     String  @id @default(cuid())
+  chatId String  @unique
+  title  String?
+  type   String
+
+  systemCompanyId Int
+  systemCompany   SystemCompany @relation(fields: [systemCompanyId], references: [id])
+
+  isActive Boolean @default(true)
 }
 
 enum AppointmentStatus {

@@ -18,7 +18,6 @@ import { SubscriptionsModule } from './subscriptions/subscriptions.module';
 import { APP_GUARD } from '@nestjs/core';
 import { AuthGuard } from './utils/guards/jwt.guard';
 import { PaginationModule } from './utils/providers/pagination/pagination.module';
-import { SmsModule } from './sms/sms.module';
 import { BullModule } from '@nestjs/bullmq';
 import { CrmModule } from './crm/crm.module';
 import { AppointmentModule } from './appointment/appointment.module';
@@ -27,8 +26,8 @@ import { CustomerCrmModule } from './customer-crm/customer-crm.module';
 import { DialerModule } from './dialer/dialer.module';
 import { ConfigModule } from '@nestjs/config';
 import { VoicemailModule } from './voicemail/voicemail.module';
-import { SmppModule } from './smpp/smpp.module';
 import { SipModule } from './debugger/sip/sip.module';
+import { TelegramModule } from './utils/telegram/telegram.module';
 
 @Module({
   imports: [
@@ -39,6 +38,7 @@ import { SipModule } from './debugger/sip/sip.module';
         port: 6379,
       },
     }),
+    TelegramModule,
     AmiModule,
     ScheduleModule.forRoot(),
     CallModule,
@@ -76,7 +76,7 @@ import { SipModule } from './debugger/sip/sip.module';
     {
       provide: APP_GUARD,
       useClass: AuthGuard
-    }
+    },
   ],
 })
 export class AppModule { }

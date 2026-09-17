@@ -93,8 +93,8 @@ export function createAgiServer(
     await next();
   });
 
-  agi.listen(4573, () => {
-    console.log('🌸 AGI Server running on port 4573 uwu~ ✨');
-  });
+  // agi.listen(4573, () => {
+  //   console.log('🌸 AGI Server running on port 4573 uwu~ ✨');
+  // });
 }
 

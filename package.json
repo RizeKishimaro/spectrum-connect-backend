@@ -58,6 +58,7 @@
     "socket.io-client": "^4.8.1",
     "swagger-ui-express": "^5.0.1",
     "systeminformation": "^5.27.7",
+    "telegraf": "^4.16.3",
     "ts-agi": "^0.0.26",
     "uuid": "^11.1.0"
   },

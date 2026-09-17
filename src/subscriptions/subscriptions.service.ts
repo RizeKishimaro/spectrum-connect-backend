@@ -35,7 +35,6 @@ export class SubscriptionsService {
           },
         },
       },
-
     });
     //  await this.prisma.subscription.findMany({
     //   include: {
